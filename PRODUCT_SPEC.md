@@ -762,6 +762,8 @@ Never mark unfinished or untested functionality as complete.
 
 ## 31. FIRST TASK
 
+Phase 0 has been approved and Phase 1 is ready for review. See [PROGRESS.md](PROGRESS.md) for completed work and verification.
+
 Begin with Phase 0 only.
 
 Inspect the current project folder, branding, design boards and downloaded character assets.

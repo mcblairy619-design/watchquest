@@ -1,8 +1,18 @@
 # Progress and asset audit
 
+## Phase 1 · 20 November 2026
+
+Phase 0 approved. Git for Windows 2.56.1 became available and the initial documentation checkpoint is `8c58584`. Git checkpoint writes were authorised outside the restricted shell. Phase 2 is awaiting owner approval.
+
+- Built the responsive React, TypeScript and Vite foundation with Home, Discover, My Watchlist, Community, Profile, Achievements and Premium. The mobile Profile page links to Achievements and Premium.
+- Added a weekly demo pick list, search, genre filters, title details, saves, watched status, Roll the Dice and the equal-chance Spin to Watch wheel for unwatched weekly films. Guest onboarding stores display name, country and genre choices locally. Match scores and the discussion are fictional samples. Preferences and watched state are specific to this browser.
+- `public/media/sg.png` and `public/media/icon.png` are unchanged copies of the supplied `SG-Logo-Transparent.png` and `SG-App-Icon.png`. The hero, posters and static mascot were generated for this prototype. The supplied boards guided the design and remain private. The static mascot is an illustration based on the concept board, with the full founder likeness and 3D work deferred.
+- Phase-specific checks covered lint, TypeScript, production build and browser tests on desktop Chrome and Edge, including phone-sized Chromium emulation. Reviewed the desktop and mobile home pages visually in Chrome. A real iPhone running Safari remains unverified.
+- Community posting, account synchronisation, streaming availability, purchases, avatar integration and installable PWA support remain in their later phases. No services or credentials were activated. The Phase 2 decisions are provider rights, initial countries and availability coverage.
+
 ## Phase 0 · 20 November 2026
 
-Asset audit and documentation complete. The local Git checkpoint is pending. Phase 1 is awaiting owner approval.
+Asset audit and documentation complete. The checkpoint was created at the start of Phase 1 after Git became available.
 
 ### Branding
 
@@ -53,4 +63,3 @@ Outstanding decisions are logged for their owning phases: viewing markets and da
 
 - Reviewed the boards and logo variants visually, read the six asset text files, counted the asset inventory and checked every external resource path referenced by web-format models.
 - Lint, TypeScript, automated application tests, production build, responsive browser checks and regressions are inapplicable in Phase 0 because the workspace has no application.
-- Phase 1 may start after owner approval. Keep the Git checkpoint visible as pending until a commit exists.

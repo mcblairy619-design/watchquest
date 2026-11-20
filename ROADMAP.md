@@ -19,4 +19,4 @@
 | 14 | Launch approved hosting and installable PWA. Verify deployment, installation and operational readiness. |
 | 15 | Evaluate native iOS and Android releases with shared APIs and domain logic. |
 
-Phase 1 is awaiting owner approval. Phase 0 findings are in [PROGRESS.md](PROGRESS.md).
+Phase 0 was approved. Phase 2 is awaiting owner approval after Phase 1. See [PROGRESS.md](PROGRESS.md) for the review and verification status.

@@ -1,6 +1,6 @@
 # Development instructions
 
-- Work one phase at a time in ROADMAP.md. Stop after Phase 0 for owner approval before Phase 1. At each phase end report results, known issues and decisions in plain British English. Ask one focused question when an essential decision requires owner input.
+- Work one phase at a time in ROADMAP.md. Stop for owner approval before starting the next phase. At each phase end report results, known issues and decisions in plain British English. Ask one focused question when an essential decision requires owner input.
 - Inspect existing files and preserve functionality and user data. Use free tooling where practical. Obtain approval for paid services. Keep keys server-side, real environment files ignored and .env.example current.
 - Use the supplied SG mark and written brand requirements. Preserve originals. Keep raw assets, reference photographs and boards out of source control and deployments. Add only approved distributable assets with documented provenance.
 - Never invent real-title metadata, scores or streaming availability. Label fixtures and disable unsupported claims. Check rights before integrating artwork or data and obtain commercial clearance before monetisation or public commercial launch.

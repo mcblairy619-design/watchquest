@@ -1,0 +1,911 @@
+import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
+import { createRoot } from "react-dom/client";
+import {
+  ArrowRight,
+  Bell,
+  Bookmark,
+  Check,
+  ChevronRight,
+  CircleHelp,
+  Compass,
+  Crown,
+  Dices,
+  House,
+  Play,
+  Search,
+  Settings,
+  Sparkles,
+  Trophy,
+  UserRound,
+  Users,
+  X,
+} from "lucide-react";
+import "@fontsource/inter/latin-400.css";
+import "@fontsource/inter/latin-600.css";
+import "@fontsource/inter/latin-700.css";
+import "@fontsource/montserrat/latin-700.css";
+import "@fontsource/montserrat/latin-800.css";
+import { genres, titles, weekly } from "./demo";
+import type { Title } from "./demo";
+import "./style.css";
+
+const pages = [
+  { id: "home", name: "Home", icon: House },
+  { id: "discover", name: "Discover", icon: Compass },
+  { id: "watchlist", name: "My Watchlist", icon: Bookmark },
+  { id: "community", name: "Community", icon: Users },
+  { id: "profile", name: "Profile", icon: UserRound },
+  { id: "achievements", name: "Achievements", icon: Trophy },
+  { id: "premium", name: "Premium", icon: Crown },
+] as const;
+type Page = (typeof pages)[number];
+type Profile = { name: string; country: string; genres: string[] };
+type Overlay = "dice" | "spin" | "onboard" | "notifications" | Title;
+const defaultProfile: Profile = {
+  name: "",
+  country: "United Kingdom",
+  genres: [],
+};
+function readLocal<T>(key: string, fallback: T): T {
+  try {
+    return (
+      JSON.parse(localStorage.getItem("sg-phase1-" + key) ?? "null") ?? fallback
+    );
+  } catch {
+    return fallback;
+  }
+}
+function useLocal<T>(key: string, fallback: T) {
+  const [value, setValue] = useState(() => readLocal(key, fallback));
+  useEffect(() => {
+    try {
+      localStorage.setItem("sg-phase1-" + key, JSON.stringify(value));
+    } catch {
+      /* The current session can still run without persistent storage. */
+    }
+  }, [key, value]);
+  return [value, setValue] as const;
+}
+const activePage = () =>
+  pages.find((item) => "#" + item.id === location.hash)?.id ?? "home";
+
+function Modal({
+  title,
+  children,
+  close,
+}: {
+  title: string;
+  children: ReactNode;
+  close: () => void;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    ref.current?.showModal();
+  }, []);
+  return (
+    <dialog
+      ref={ref}
+      aria-labelledby="dialog-title"
+      onCancel={(event) => {
+        event.preventDefault();
+        close();
+      }}
+    >
+      <div className="dialog-head">
+        <h2 id="dialog-title">{title}</h2>
+        <button className="icon-button" aria-label="Close" onClick={close}>
+          <X />
+        </button>
+      </div>
+      {children}
+    </dialog>
+  );
+}
+
+function Onboarding({
+  profile,
+  save,
+  close,
+}: {
+  profile: Profile;
+  save: (value: Profile) => void;
+  close: () => void;
+}) {
+  const [step, setStep] = useState(0);
+  const [draft, setDraft] = useState(profile);
+  return (
+    <Modal title="Set up your Movie DNA" close={close}>
+      <p className="eyebrow">STEP {step + 1} OF 3</p>
+      {step === 0 && (
+        <div className="welcome">
+          <div className="mascot">
+            <img
+              src="/media/mascot.jpg"
+              alt="Founder mascot concept in a dark hoodie"
+            />
+            <img className="mascot-logo" src="/media/sg.png" alt="" />
+          </div>
+          <div>
+            <h3>Welcome to Stream Guide</h3>
+            <p>
+              Pick a viewing country and the genres you enjoy. You can try the
+              site as a guest.
+            </p>
+          </div>
+        </div>
+      )}
+      {step === 1 && (
+        <div className="form-stack">
+          <label>
+            Display name (optional)
+            <input
+              maxLength={30}
+              value={draft.name}
+              onChange={(event) =>
+                setDraft({ ...draft, name: event.target.value })
+              }
+            />
+          </label>
+          <label>
+            Viewing country
+            <select
+              value={draft.country}
+              onChange={(event) =>
+                setDraft({ ...draft, country: event.target.value })
+              }
+            >
+              {[
+                "United Kingdom",
+                "Ireland",
+                "United States",
+                "Canada",
+                "Australia",
+                "Other",
+              ].map((country) => (
+                <option key={country}>{country}</option>
+              ))}
+            </select>
+          </label>
+          <p>Country is saved for future availability checks.</p>
+        </div>
+      )}
+      {step === 2 && (
+        <>
+          <h3>What do you like watching?</h3>
+          <div className="chips">
+            {genres.map((genre) => (
+              <button
+                key={genre}
+                className="chip"
+                aria-pressed={draft.genres.includes(genre)}
+                onClick={() =>
+                  setDraft({
+                    ...draft,
+                    genres: draft.genres.includes(genre)
+                      ? draft.genres.filter((value) => value !== genre)
+                      : [...draft.genres, genre],
+                  })
+                }
+              >
+                {genre}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      <div className="actions">
+        <button
+          className="button secondary"
+          onClick={() => (step ? setStep(step - 1) : close())}
+        >
+          {step ? "Back" : "Skip for now"}
+        </button>
+        <button
+          className="button primary"
+          onClick={() =>
+            step < 2
+              ? setStep(step + 1)
+              : save({ ...draft, name: draft.name.trim() })
+          }
+        >
+          {step === 0
+            ? "Continue as guest"
+            : step === 1
+              ? "Continue"
+              : "Save preferences"}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+function App() {
+  const [page, setPage] = useState(activePage);
+  const [saved, setSaved] = useLocal<string[]>("saved", []);
+  const [watched, setWatched] = useLocal<string[]>("watched", []);
+  const [profile, setProfile] = useLocal("profile", defaultProfile);
+  const [query, setQuery] = useState("");
+  const [genre, setGenre] = useState("All");
+  const [overlay, setOverlay] = useState<Overlay>();
+  const [result, setResult] = useState<Title>();
+  const [diceHistory, setDiceHistory] = useState<string[]>([]);
+  const [turn, setTurn] = useState(0);
+  const [spinning, setSpinning] = useState(false);
+  const spinTimer = useRef<number | undefined>(undefined);
+  const search = useRef<HTMLInputElement>(null);
+  const main = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const navigate = () => {
+      setPage(activePage());
+      window.scrollTo(0, 0);
+      if (document.activeElement !== search.current)
+        main.current?.focus({ preventScroll: true });
+    };
+    window.addEventListener("hashchange", navigate);
+    return () => window.removeEventListener("hashchange", navigate);
+  }, []);
+  useEffect(() => () => window.clearTimeout(spinTimer.current), []);
+  useEffect(() => {
+    document.title =
+      page === "home"
+        ? "Stream Guide"
+        : pages.find((item) => item.id === page)?.name + " | Stream Guide";
+  }, [page]);
+
+  const toggleSaved = (id: string) =>
+    setSaved((previous) =>
+      previous.includes(id)
+        ? previous.filter((value) => value !== id)
+        : [...previous, id],
+    );
+  const toggleWatched = (id: string) =>
+    setWatched((previous) =>
+      previous.includes(id)
+        ? previous.filter((value) => value !== id)
+        : [...previous, id],
+    );
+  const close = () => {
+    window.clearTimeout(spinTimer.current);
+    setSpinning(false);
+    setOverlay(undefined);
+  };
+  const open = (value: Overlay) => {
+    setResult(undefined);
+    setTurn(0);
+    setOverlay(value);
+  };
+  const spinPool = weekly.filter(
+    (title) => title.type === "Film" && !watched.includes(title.id),
+  );
+  const dicePool = titles.filter((title) => !watched.includes(title.id));
+  function rollDice() {
+    const unrolled = dicePool.filter(
+      (title) => !diceHistory.includes(title.id),
+    );
+    const pool = unrolled.length
+      ? unrolled
+      : dicePool.filter(
+          (title) => dicePool.length === 1 || title.id !== result?.id,
+        );
+    const next = pool[Math.floor(Math.random() * pool.length)];
+    if (next) {
+      setResult(next);
+      setDiceHistory(unrolled.length ? [...diceHistory, next.id] : [next.id]);
+    }
+  }
+  function spinWheel() {
+    if (spinning || !spinPool.length) return;
+    const index = Math.floor(Math.random() * spinPool.length);
+    const angle = 360 - ((index + 0.5) * 360) / spinPool.length;
+    const next = (Math.floor(turn / 360) + 4) * 360 + angle;
+    setTurn(next);
+    setResult(undefined);
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setResult(spinPool[index]);
+      return;
+    }
+    setSpinning(true);
+    spinTimer.current = window.setTimeout(() => {
+      setResult(spinPool[index]);
+      setSpinning(false);
+    }, 950);
+  }
+  const nav = (item: Page, label: string = item.name) => (
+    <a
+      key={item.id}
+      href={"#" + item.id}
+      aria-current={page === item.id ? "page" : undefined}
+    >
+      <item.icon size={19} />
+      <span>{label}</span>
+    </a>
+  );
+  const filtered = titles.filter(
+    (title) =>
+      (genre === "All" || title.genre === genre) &&
+      (title.name + " " + title.genre + " " + title.type)
+        .toLowerCase()
+        .includes(query.trim().toLowerCase()),
+  );
+  const cards = (items: readonly Title[]) => (
+    <div className="cards">
+      {items.map((title) => (
+        <article className="card" key={title.id}>
+          <button
+            className="poster"
+            aria-label={"View " + title.name}
+            onClick={() => open(title)}
+          >
+            <img alt="" src={"/media/" + title.art + ".jpg"} loading="lazy" />
+            <span className="match">{title.score}% demo match</span>
+            <span className="poster-title">{title.name}</span>
+          </button>
+          <div className="card-footer">
+            <div>
+              <h3>{title.name}</h3>
+              <p>
+                {title.genre} · {title.type}
+              </p>
+            </div>
+            <button
+              className="icon-button"
+              aria-label={
+                saved.includes(title.id)
+                  ? "Remove " + title.name + " from watchlist"
+                  : "Save " + title.name
+              }
+              aria-pressed={saved.includes(title.id)}
+              onClick={() => toggleSaved(title.id)}
+            >
+              <Bookmark size={17} />
+            </button>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+
+  return (
+    <>
+      <a
+        className="skip"
+        href="#content"
+        onClick={(event) => {
+          event.preventDefault();
+          main.current?.focus();
+        }}
+      >
+        Skip to content
+      </a>
+      <aside className="sidebar">
+        <a className="brand" href="#home">
+          <img src="/media/sg.png" alt="" />{" "}
+          <span>
+            STREAM <b>GUIDE</b>
+          </span>
+        </a>
+        <nav aria-label="Main navigation">
+          {pages.slice(0, 5).map((item) => nav(item))}
+          <div className="nav-divider" />
+          {pages.slice(5).map((item) => nav(item))}
+        </nav>
+        <button className="sidebar-setup" onClick={() => open("onboard")}>
+          <Sparkles size={18} />
+          <span>
+            <strong>Movie DNA</strong>
+            <small>
+              {profile.genres.length
+                ? "Edit preferences"
+                : "Set up your taste profile"}
+            </small>
+          </span>
+          <ChevronRight size={16} />
+        </button>
+      </aside>
+      <div className="shell">
+        <header className="topbar">
+          <a className="mobile-brand brand" href="#home">
+            <img src="/media/sg.png" alt="" />
+            <span>
+              STREAM <b>GUIDE</b>
+            </span>
+          </a>
+          <span className="prototype">
+            <span></span> Demo catalogue
+          </span>
+          <form
+            className="search"
+            role="search"
+            onSubmit={(event) => {
+              event.preventDefault();
+              setGenre("All");
+              location.hash = "discover";
+            }}
+          >
+            <Search size={17} />
+            <input
+              ref={search}
+              type="search"
+              aria-label="Search demo titles"
+              value={query}
+              placeholder="Search demo titles"
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setGenre("All");
+                if (page !== "discover") location.hash = "discover";
+              }}
+            />
+          </form>
+          <button
+            className="icon-button top-icon"
+            onClick={() => open("notifications")}
+            aria-label="Notifications"
+          >
+            <Bell size={18} />
+          </button>
+          <a
+            className="icon-button top-icon account"
+            href="#profile"
+            aria-label="Profile"
+          >
+            <UserRound size={18} />
+          </a>
+        </header>
+        <main id="content" tabIndex={-1} ref={main}>
+          {page === "home" && (
+            <>
+              <section className="hero">
+                <div className="hero-content">
+                  <p className="eyebrow">FILM &amp; TV DISCOVERY</p>
+                  <h1>
+                    LESS SCROLLING.
+                    <br />
+                    <em>MORE WATCHING.</em>
+                  </h1>
+                  <p>
+                    Find your next favourite film or series. Explore the demo
+                    catalogue and start building your watchlist.
+                  </p>
+                  <div className="actions">
+                    <a
+                      className="button primary"
+                      href="#discover"
+                      onClick={() => {
+                        setQuery("");
+                        setGenre("All");
+                      }}
+                    >
+                      <Play size={17} /> Find something to watch
+                    </a>
+                    <button
+                      className="button secondary"
+                      onClick={() => open("dice")}
+                    >
+                      <Dices size={19} /> Roll the Dice
+                    </button>
+                  </div>
+                </div>
+              </section>
+              <section className="weekly">
+                <div className="section-head">
+                  <div>
+                    <h2>This Week’s Watchlist</h2>
+                    <p>
+                      Five films and one series from the fictional demo
+                      catalogue.
+                    </p>
+                  </div>
+                  <a
+                    href="#discover"
+                    onClick={() => {
+                      setQuery("");
+                      setGenre("All");
+                    }}
+                  >
+                    Browse all <ArrowRight size={16} />
+                  </a>
+                </div>
+                {cards(weekly)}
+              </section>
+              <section className="quick-actions" aria-label="Discovery tools">
+                <button onClick={() => open("dice")}>
+                  <Dices />
+                  <span>
+                    <strong>Roll the Dice</strong>
+                    <small>Get a surprise demo pick.</small>
+                  </span>
+                  <ChevronRight size={18} />
+                </button>
+                <button onClick={() => open("spin")}>
+                  <Compass />
+                  <span>
+                    <strong>Spin to Watch</strong>
+                    <small>Choose from this week’s films.</small>
+                  </span>
+                  <ChevronRight size={18} />
+                </button>
+                <button onClick={() => open("onboard")}>
+                  <Sparkles />
+                  <span>
+                    <strong>Set up Movie DNA</strong>
+                    <small>Save your viewing preferences.</small>
+                  </span>
+                  <ChevronRight size={18} />
+                </button>
+              </section>
+            </>
+          )}
+          {page === "discover" && (
+            <>
+              <h1>Discover</h1>
+              <p className="intro">
+                Browse fictional films and series. Streaming availability is
+                unverified.
+              </p>
+              <div className="chips">
+                {["All", ...genres].map((item) => (
+                  <button
+                    className="chip"
+                    key={item}
+                    aria-pressed={genre === item}
+                    onClick={() => setGenre(item)}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+              {filtered.length ? (
+                cards(filtered)
+              ) : (
+                <div className="panel">
+                  <h2>No titles found</h2>
+                  <p>Try a different search or genre.</p>
+                  <button
+                    className="button secondary"
+                    onClick={() => {
+                      setQuery("");
+                      setGenre("All");
+                    }}
+                  >
+                    Clear filters
+                  </button>
+                </div>
+              )}
+              <div className="actions">
+                <button
+                  className="button secondary"
+                  onClick={() => open("dice")}
+                >
+                  <Dices size={18} /> Roll the Dice
+                </button>
+                <button
+                  className="button secondary"
+                  onClick={() => open("spin")}
+                >
+                  <Compass size={18} /> Spin to Watch
+                </button>
+              </div>
+            </>
+          )}
+          {page === "watchlist" && (
+            <>
+              <h1>My Watchlist</h1>
+              <p className="intro">
+                Your saved demo titles are stored in this browser.
+              </p>
+              {saved.length ? (
+                cards(titles.filter((title) => saved.includes(title.id)))
+              ) : (
+                <div className="panel">
+                  <Bookmark />
+                  <h2>Your watchlist is empty</h2>
+                  <p>
+                    Use the bookmark button on any demo title to save it here.
+                  </p>
+                  <a
+                    href="#discover"
+                    className="button primary"
+                    onClick={() => {
+                      setQuery("");
+                      setGenre("All");
+                    }}
+                  >
+                    Browse the catalogue
+                  </a>
+                </div>
+              )}
+            </>
+          )}
+          {page === "community" && (
+            <>
+              <h1>Community</h1>
+              <p className="intro">
+                Preview a sample discussion. Public posting will be available in
+                a later phase.
+              </p>
+              <div className="panel">
+                <Users />
+                <h2>Demo discussion</h2>
+                <h3>What makes a good slow-burn mystery?</h3>
+                <p>
+                  Sample member · “A small cast and a setting that feels like a
+                  character of its own.”
+                </p>
+                <button
+                  className="button secondary"
+                  onClick={() => open(titles[2])}
+                >
+                  View the featured demo title
+                </button>
+              </div>
+            </>
+          )}
+          {page === "profile" && (
+            <>
+              <h1>Profile</h1>
+              <div className="panel">
+                <UserRound />
+                <h2>{profile.name || "Guest viewer"}</h2>
+                <p>
+                  {profile.country} · {saved.length} saved · {watched.length}{" "}
+                  watched
+                </p>
+                <p>
+                  {profile.genres.length
+                    ? "Favourite genres: " + profile.genres.join(", ")
+                    : "Choose your favourite genres in Movie DNA."}
+                </p>
+                <button
+                  className="button primary"
+                  onClick={() => open("onboard")}
+                >
+                  <Settings size={18} /> Edit viewing preferences
+                </button>
+              </div>
+            </>
+          )}
+          {page === "achievements" && (
+            <>
+              <h1>Achievements</h1>
+              <p className="intro">
+                Preview progress with activity from this browser.
+              </p>
+              <div className="feature-grid">
+                {[
+                  {
+                    name: "First Save",
+                    desc: "Save a demo title.",
+                    done: saved.length > 0,
+                  },
+                  {
+                    name: "First Film",
+                    desc: "Mark a demo film as watched.",
+                    done: titles.some(
+                      (title) =>
+                        title.type === "Film" && watched.includes(title.id),
+                    ),
+                  },
+                ].map((item) => (
+                  <div className="panel" key={item.name}>
+                    <Trophy />
+                    <h2>{item.name}</h2>
+                    <p>{item.desc}</p>
+                    <strong>
+                      {item.done ? "Unlocked in this demo" : "In progress"}
+                    </strong>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+          {page === "premium" && (
+            <>
+              <h1>Stream Guide+</h1>
+              <p className="intro">
+                Preview the proposed membership. Sign-ups and payments are
+                disabled.
+              </p>
+              <div className="panel premium">
+                <Crown />
+                <h2>Proposed plans</h2>
+                <p className="price">£1.99 per month · £19.99 per year</p>
+                <ul>
+                  <li>Fifteen films and three series each week</li>
+                  <li>Unlimited dice rolls</li>
+                  <li>Advanced viewing statistics and Movie DNA insights</li>
+                  <li>Couple and Friends Mode</li>
+                </ul>
+              </div>
+            </>
+          )}
+          {page === "profile" && (
+            <div className="mobile-profile-links">
+              <a href="#achievements">
+                <Trophy size={18} /> Achievements
+              </a>
+              <a href="#premium">
+                <Crown size={18} /> Premium
+              </a>
+            </div>
+          )}
+        </main>
+        <footer>
+          <span>Stream Guide prototype</span>
+          <button onClick={() => open("onboard")}>
+            <CircleHelp size={16} /> Get started
+          </button>
+        </footer>
+      </div>
+      <nav className="mobile-nav" aria-label="Mobile navigation">
+        {pages
+          .slice(0, 5)
+          .map((item) =>
+            nav(item, item.id === "watchlist" ? "Saved" : item.name),
+          )}
+      </nav>
+
+      {overlay === "onboard" && (
+        <Onboarding
+          profile={profile}
+          close={close}
+          save={(value) => {
+            setProfile(value);
+            close();
+            location.hash = "profile";
+          }}
+        />
+      )}
+      {overlay === "notifications" && (
+        <Modal title="Notifications" close={close}>
+          <p>You have no notifications in this demo.</p>
+        </Modal>
+      )}
+      {(overlay === "dice" || overlay === "spin") && (
+        <Modal
+          title={overlay === "dice" ? "Roll the Dice" : "Spin to Watch"}
+          close={close}
+        >
+          <p>
+            {overlay === "dice"
+              ? "Draw a fictional film or series from the demo catalogue."
+              : "Every unwatched film in this week’s list has an equal chance."}
+          </p>
+          {overlay === "dice" && (
+            <div
+              className="dice-preview"
+              key={result?.id ?? "ready"}
+              aria-hidden="true"
+            >
+              <Dices size={42} />
+            </div>
+          )}
+          {overlay === "spin" && spinPool.length > 0 && (
+            <div className="wheel-area">
+              <div className="wheel-pointer" aria-hidden="true" />
+              <div
+                className="wheel"
+                aria-hidden="true"
+                style={{
+                  transform: "rotate(" + turn + "deg)",
+                  background:
+                    "conic-gradient(" +
+                    spinPool
+                      .map(
+                        (_, i) =>
+                          [
+                            "#104f9a",
+                            "#073167",
+                            "#176dc8",
+                            "#142644",
+                            "#244889",
+                          ][i] +
+                          " " +
+                          (i * 100) / spinPool.length +
+                          "% " +
+                          ((i + 1) * 100) / spinPool.length +
+                          "%",
+                      )
+                      .join(",") +
+                    ")",
+                }}
+              >
+                {spinPool.map((item, i) => (
+                  <span
+                    key={item.id}
+                    style={{
+                      transform:
+                        "rotate(" +
+                        ((i + 0.5) * 360) / spinPool.length +
+                        "deg)",
+                    }}
+                  >
+                    {item.name}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          <div aria-live="polite">
+            {result && (
+              <div className="result">
+                <img src={"/media/" + result.art + ".jpg"} alt="" />
+                <div>
+                  <h3>{result.name}</h3>
+                  <p>
+                    {result.genre} · {result.time} · {result.score}% demo match
+                  </p>
+                  <p>Streaming availability unverified.</p>
+                  <button
+                    className="button secondary"
+                    onClick={() => open(result)}
+                  >
+                    View details
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+          {!(overlay === "dice" ? dicePool.length : spinPool.length) ? (
+            <p>No unwatched demo titles remain for this activity.</p>
+          ) : (
+            <button
+              className="button primary"
+              disabled={spinning}
+              onClick={overlay === "dice" ? rollDice : spinWheel}
+            >
+              {overlay === "dice"
+                ? result
+                  ? "Roll again"
+                  : "Roll the Dice"
+                : spinning
+                  ? "Spinning…"
+                  : result
+                    ? "Spin again"
+                    : "Spin the wheel"}
+            </button>
+          )}
+        </Modal>
+      )}
+      {overlay && typeof overlay === "object" && (
+        <Modal title={overlay.name} close={close}>
+          <div className="result">
+            <img src={"/media/" + overlay.art + ".jpg"} alt="" />
+            <div>
+              <p className="eyebrow">FICTIONAL DEMO TITLE</p>
+              <p>
+                {overlay.genre} · {overlay.type} · {overlay.time}
+              </p>
+              <p>{overlay.synopsis}</p>
+              <p>Streaming availability unverified.</p>
+            </div>
+          </div>
+          <div className="actions">
+            <button
+              className="button primary"
+              aria-pressed={saved.includes(overlay.id)}
+              onClick={() => toggleSaved(overlay.id)}
+            >
+              <Bookmark size={17} />
+              {saved.includes(overlay.id)
+                ? "Remove from watchlist"
+                : "Save to watchlist"}
+            </button>
+            <button
+              className="button secondary"
+              aria-pressed={watched.includes(overlay.id)}
+              onClick={() => toggleWatched(overlay.id)}
+            >
+              <Check size={17} />
+              {watched.includes(overlay.id)
+                ? "Mark as unwatched"
+                : "Mark as watched"}
+            </button>
+          </div>
+        </Modal>
+      )}
+    </>
+  );
+}
+createRoot(document.getElementById("root")!).render(<App />);
