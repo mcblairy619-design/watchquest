@@ -10,6 +10,46 @@
   --sidebar: 224px;
   color-scheme: dark;
 }
+.poster-placeholder {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(145deg, #244771, #111827 75%);
+  color: #9ac5ee;
+}
+.result .poster-placeholder {
+  width: clamp(80px, 25vw, 130px);
+  aspect-ratio: 2 / 3;
+  border-radius: 9px;
+  flex-shrink: 0;
+}
+.availability {
+  margin-top: 16px;
+}
+.availability ul {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.availability li {
+  display: grid;
+  gap: 4px;
+  padding: 9px;
+  border: 1px solid #3f5779;
+  border-radius: 7px;
+}
+.availability a,
+dialog p a {
+  color: #83c7ff;
+  text-decoration: underline;
+}
+.tmdb-logo {
+  display: block;
+  width: 72px;
+  margin-block: 8px 12px;
+}
 * {
   box-sizing: border-box;
 }

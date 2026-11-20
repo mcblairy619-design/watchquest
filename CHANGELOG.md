@@ -1,5 +1,11 @@
 # Changelog
 
+## 20 November 2026 · Phase 2
+
+- Added opt-in TMDB metadata and Movie of the Night availability behind a local server API.
+- Connected discovery, weekly picks, dice and wheel to the configured catalogue while preserving earlier browser data.
+- Added distinct offer types, country lookup, source credits, caching, request budgets and provider tests.
+
 ## 20 November 2026 · Phase 1
 
 - Added the responsive React website and seven prototype pages with the approved SG branding.

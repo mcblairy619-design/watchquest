@@ -26,8 +26,14 @@ import "@fontsource/inter/latin-600.css";
 import "@fontsource/inter/latin-700.css";
 import "@fontsource/montserrat/latin-700.css";
 import "@fontsource/montserrat/latin-800.css";
-import { genres, titles, weekly } from "./demo";
-import type { Title } from "./demo";
+import { genres as demoGenres, titles as demoTitles } from "./demo";
+import {
+  Availability,
+  countries,
+  Poster,
+  useCatalogueRequest,
+} from "./catalogue";
+import type { Title } from "./catalogue";
 import "./style.css";
 
 const pages = [
@@ -41,7 +47,8 @@ const pages = [
 ] as const;
 type Page = (typeof pages)[number];
 type Profile = { name: string; country: string; genres: string[] };
-type Overlay = "dice" | "spin" | "onboard" | "notifications" | Title;
+type Overlay =
+  "dice" | "spin" | "onboard" | "notifications" | "credits" | Title;
 const defaultProfile: Profile = {
   name: "",
   country: "United Kingdom",
@@ -174,7 +181,7 @@ function Onboarding({
         <>
           <h3>What do you like watching?</h3>
           <div className="chips">
-            {genres.map((genre) => (
+            {demoGenres.map((genre) => (
               <button
                 key={genre}
                 className="chip"
@@ -220,6 +227,91 @@ function Onboarding({
   );
 }
 
+function RequestMessage({
+  loading,
+  error,
+  retry,
+}: {
+  loading: boolean;
+  error?: string;
+  retry: () => void;
+}) {
+  return loading ? (
+    <p role="status">Loading catalogue…</p>
+  ) : error ? (
+    <div className="panel">
+      <p role="status">{error}</p>
+      <button className="button secondary" onClick={retry}>
+        Retry
+      </button>
+    </div>
+  ) : null;
+}
+
+function SavedEntry({
+  id,
+  render,
+  remove,
+}: {
+  id: string;
+  render: (title: Title) => ReactNode;
+  remove: () => void;
+}) {
+  const demo = demoTitles.find((title) => title.id === id);
+  const request = useCatalogueRequest<{ title: Title }>(
+    demo ? undefined : "/api/catalogue/" + encodeURIComponent(id),
+  );
+  const title = demo ?? request.data?.title;
+  if (title) return render(title);
+  return (
+    <div className="panel">
+      <RequestMessage {...request} />
+      <button className="button secondary" onClick={remove}>
+        Remove saved entry
+      </button>
+    </div>
+  );
+}
+
+function TitleDetails({ title, country }: { title: Title; country: string }) {
+  const detail = useCatalogueRequest<{ title: Title }>(
+    title.score === undefined ? "/api/catalogue/" + title.id : undefined,
+  );
+  const item = detail.data?.title ?? title;
+  return (
+    <>
+      <div className="result">
+        <Poster title={item} />
+        <div>
+          {item.score !== undefined && (
+            <p className="eyebrow">FICTIONAL DEMO TITLE</p>
+          )}
+          <p>
+            {[
+              item.genres?.length ? item.genres.join(", ") : item.genre,
+              item.type,
+              item.time,
+              item.releaseDate,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+          <p>{item.synopsis || "Description unavailable."}</p>
+          {detail.error && (
+            <p>
+              Full details unavailable.{" "}
+              <button className="button secondary" onClick={detail.retry}>
+                Retry
+              </button>
+            </p>
+          )}
+        </div>
+      </div>
+      <Availability title={item} country={country} />
+    </>
+  );
+}
+
 function App() {
   const [page, setPage] = useState(activePage);
   const [saved, setSaved] = useLocal<string[]>("saved", []);
@@ -235,6 +327,35 @@ function App() {
   const spinTimer = useRef<number | undefined>(undefined);
   const search = useRef<HTMLInputElement>(null);
   const main = useRef<HTMLElement>(null);
+  const status = useCatalogueRequest<{ enabled: boolean }>(
+    "/api/catalogue/status",
+  );
+  const live = status.data?.enabled === true;
+  const region = countries[profile.country] ?? "";
+  const cataloguePath = "/api/catalogue?country=" + region;
+  const catalogue = useCatalogueRequest<{ titles: Title[] }>(
+    live ? cataloguePath : undefined,
+  );
+  const searchPath =
+    live && page === "discover" && query.trim()
+      ? cataloguePath + "&q=" + encodeURIComponent(query.trim())
+      : undefined;
+  const searchResults = useCatalogueRequest<{ titles: Title[] }>(
+    searchPath,
+    350,
+  );
+  const titles: readonly Title[] = live
+    ? (catalogue.data?.titles ?? [])
+    : demoTitles;
+  const weekly = [
+    ...titles.filter((title) => title.type === "Film").slice(0, 5),
+    ...titles.filter((title) => title.type === "Series").slice(0, 1),
+  ];
+  const browseRequest = searchPath ? searchResults : catalogue;
+  const browse = searchPath ? (searchResults.data?.titles ?? []) : titles;
+  const genres = [
+    ...new Set(browse.flatMap((title) => title.genres ?? [title.genre])),
+  ];
 
   useEffect(() => {
     const navigate = () => {
@@ -322,49 +443,51 @@ function App() {
       <span>{label}</span>
     </a>
   );
-  const filtered = titles.filter(
+  const filtered = browse.filter(
     (title) =>
-      (genre === "All" || title.genre === genre) &&
-      (title.name + " " + title.genre + " " + title.type)
-        .toLowerCase()
-        .includes(query.trim().toLowerCase()),
+      (genre === "All" || (title.genres ?? [title.genre]).includes(genre)) &&
+      (live ||
+        (title.name + " " + title.genre + " " + title.type)
+          .toLowerCase()
+          .includes(query.trim().toLowerCase())),
+  );
+  const card = (title: Title) => (
+    <article className="card" key={title.id}>
+      <button
+        className="poster"
+        aria-label={"View " + title.name}
+        onClick={() => open(title)}
+      >
+        <Poster title={title} />
+        {title.score !== undefined && (
+          <span className="match">{title.score}% demo match</span>
+        )}
+        <span className="poster-title">{title.name}</span>
+      </button>
+      <div className="card-footer">
+        <div>
+          <h3>{title.name}</h3>
+          <p>
+            {title.genre} · {title.type}
+          </p>
+        </div>
+        <button
+          className="icon-button"
+          aria-label={
+            saved.includes(title.id)
+              ? "Remove " + title.name + " from watchlist"
+              : "Save " + title.name
+          }
+          aria-pressed={saved.includes(title.id)}
+          onClick={() => toggleSaved(title.id)}
+        >
+          <Bookmark size={17} />
+        </button>
+      </div>
+    </article>
   );
   const cards = (items: readonly Title[]) => (
-    <div className="cards">
-      {items.map((title) => (
-        <article className="card" key={title.id}>
-          <button
-            className="poster"
-            aria-label={"View " + title.name}
-            onClick={() => open(title)}
-          >
-            <img alt="" src={"/media/" + title.art + ".jpg"} loading="lazy" />
-            <span className="match">{title.score}% demo match</span>
-            <span className="poster-title">{title.name}</span>
-          </button>
-          <div className="card-footer">
-            <div>
-              <h3>{title.name}</h3>
-              <p>
-                {title.genre} · {title.type}
-              </p>
-            </div>
-            <button
-              className="icon-button"
-              aria-label={
-                saved.includes(title.id)
-                  ? "Remove " + title.name + " from watchlist"
-                  : "Save " + title.name
-              }
-              aria-pressed={saved.includes(title.id)}
-              onClick={() => toggleSaved(title.id)}
-            >
-              <Bookmark size={17} />
-            </button>
-          </div>
-        </article>
-      ))}
-    </div>
+    <div className="cards">{items.map(card)}</div>
   );
 
   return (
@@ -413,7 +536,7 @@ function App() {
             </span>
           </a>
           <span className="prototype">
-            <span></span> Demo catalogue
+            <span></span> {live ? "TMDB catalogue" : "Demo catalogue"}
           </span>
           <form
             className="search"
@@ -428,9 +551,14 @@ function App() {
             <input
               ref={search}
               type="search"
-              aria-label="Search demo titles"
+              aria-label={
+                live ? "Search films and series" : "Search demo titles"
+              }
               value={query}
-              placeholder="Search demo titles"
+              placeholder={
+                live ? "Search films and series" : "Search demo titles"
+              }
+              maxLength={100}
               onChange={(event) => {
                 setQuery(event.target.value);
                 setGenre("All");
@@ -465,8 +593,9 @@ function App() {
                     <em>MORE WATCHING.</em>
                   </h1>
                   <p>
-                    Find your next favourite film or series. Explore the demo
-                    catalogue and start building your watchlist.
+                    Find your next favourite film or series. Explore the{" "}
+                    {live ? "catalogue" : "demo catalogue"} and start building
+                    your watchlist.
                   </p>
                   <div className="actions">
                     <a
@@ -493,8 +622,9 @@ function App() {
                   <div>
                     <h2>This Week’s Watchlist</h2>
                     <p>
-                      Five films and one series from the fictional demo
-                      catalogue.
+                      {live
+                        ? "Popular films and series. Open a title to check where it streams."
+                        : "Five films and one series from the fictional demo catalogue."}
                     </p>
                   </div>
                   <a
@@ -507,14 +637,23 @@ function App() {
                     Browse all <ArrowRight size={16} />
                   </a>
                 </div>
-                {cards(weekly)}
+                <RequestMessage {...catalogue} />
+                {weekly.length
+                  ? cards(weekly)
+                  : live &&
+                    !catalogue.loading &&
+                    !catalogue.error && (
+                      <p>No catalogue picks are available.</p>
+                    )}
               </section>
               <section className="quick-actions" aria-label="Discovery tools">
                 <button onClick={() => open("dice")}>
                   <Dices />
                   <span>
                     <strong>Roll the Dice</strong>
-                    <small>Get a surprise demo pick.</small>
+                    <small>
+                      Get a surprise {live ? "catalogue" : "demo"} pick.
+                    </small>
                   </span>
                   <ChevronRight size={18} />
                 </button>
@@ -541,8 +680,9 @@ function App() {
             <>
               <h1>Discover</h1>
               <p className="intro">
-                Browse fictional films and series. Streaming availability is
-                unverified.
+                {live
+                  ? "Browse films and series. Open a title to check offers in your viewing country."
+                  : "Browse fictional films and series. Streaming availability is unverified."}
               </p>
               <div className="chips">
                 {["All", ...genres].map((item) => (
@@ -556,7 +696,9 @@ function App() {
                   </button>
                 ))}
               </div>
-              {filtered.length ? (
+              <RequestMessage {...browseRequest} />
+              {browseRequest.loading ||
+              browseRequest.error ? null : filtered.length ? (
                 cards(filtered)
               ) : (
                 <div className="panel">
@@ -593,10 +735,19 @@ function App() {
             <>
               <h1>My Watchlist</h1>
               <p className="intro">
-                Your saved demo titles are stored in this browser.
+                Your saved titles are stored in this browser.
               </p>
               {saved.length ? (
-                cards(titles.filter((title) => saved.includes(title.id)))
+                <div className="cards">
+                  {saved.map((id) => (
+                    <SavedEntry
+                      key={id}
+                      id={id}
+                      render={card}
+                      remove={() => toggleSaved(id)}
+                    />
+                  ))}
+                </div>
               ) : (
                 <div className="panel">
                   <Bookmark />
@@ -635,7 +786,7 @@ function App() {
                 </p>
                 <button
                   className="button secondary"
-                  onClick={() => open(titles[2])}
+                  onClick={() => open(demoTitles[2])}
                 >
                   View the featured demo title
                 </button>
@@ -682,9 +833,12 @@ function App() {
                   {
                     name: "First Film",
                     desc: "Mark a demo film as watched.",
-                    done: titles.some(
-                      (title) =>
-                        title.type === "Film" && watched.includes(title.id),
+                    done: watched.some(
+                      (id) =>
+                        id.startsWith("tmdb-movie-") ||
+                        demoTitles.some(
+                          (title) => title.id === id && title.type === "Film",
+                        ),
                     ),
                   },
                 ].map((item) => (
@@ -733,6 +887,7 @@ function App() {
         </main>
         <footer>
           <span>Stream Guide prototype</span>
+          {live && <button onClick={() => open("credits")}>Credits</button>}
           <button onClick={() => open("onboard")}>
             <CircleHelp size={16} /> Get started
           </button>
@@ -762,6 +917,24 @@ function App() {
           <p>You have no notifications in this demo.</p>
         </Modal>
       )}
+      {overlay === "credits" && (
+        <Modal title="Credits" close={close}>
+          <a href="https://www.themoviedb.org">
+            <img className="tmdb-logo" src="/media/tmdb.svg" alt="TMDB" />
+          </a>
+          <p>
+            This product uses the TMDB API but is not endorsed or certified by
+            TMDB.
+          </p>
+          <p>
+            Streaming availability information is provided by the{" "}
+            <a href="https://www.movieofthenight.com/about/api">
+              Streaming Availability API by Movie of the Night
+            </a>{" "}
+            when enabled.
+          </p>
+        </Modal>
+      )}
       {(overlay === "dice" || overlay === "spin") && (
         <Modal
           title={overlay === "dice" ? "Roll the Dice" : "Spin to Watch"}
@@ -769,7 +942,9 @@ function App() {
         >
           <p>
             {overlay === "dice"
-              ? "Draw a fictional film or series from the demo catalogue."
+              ? live
+                ? "Draw a film or series from the catalogue."
+                : "Draw a fictional film or series from the demo catalogue."
               : "Every unwatched film in this week’s list has an equal chance."}
           </p>
           {overlay === "dice" && (
@@ -830,13 +1005,25 @@ function App() {
           <div aria-live="polite">
             {result && (
               <div className="result">
-                <img src={"/media/" + result.art + ".jpg"} alt="" />
+                <Poster title={result} />
                 <div>
                   <h3>{result.name}</h3>
                   <p>
-                    {result.genre} · {result.time} · {result.score}% demo match
+                    {[
+                      result.genre,
+                      result.time,
+                      result.score === undefined
+                        ? undefined
+                        : result.score + "% demo match",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </p>
-                  <p>Streaming availability unverified.</p>
+                  <p>
+                    {live
+                      ? "View details to check streaming options."
+                      : "Streaming availability unverified."}
+                  </p>
                   <button
                     className="button secondary"
                     onClick={() => open(result)}
@@ -847,8 +1034,14 @@ function App() {
               </div>
             )}
           </div>
-          {!(overlay === "dice" ? dicePool.length : spinPool.length) ? (
-            <p>No unwatched demo titles remain for this activity.</p>
+          <RequestMessage {...catalogue} />
+          {catalogue.loading || catalogue.error ? null : !(overlay === "dice"
+              ? dicePool.length
+              : spinPool.length) ? (
+            <p>
+              No unwatched {live ? "catalogue" : "demo"} titles remain for this
+              activity.
+            </p>
           ) : (
             <button
               className="button primary"
@@ -870,17 +1063,11 @@ function App() {
       )}
       {overlay && typeof overlay === "object" && (
         <Modal title={overlay.name} close={close}>
-          <div className="result">
-            <img src={"/media/" + overlay.art + ".jpg"} alt="" />
-            <div>
-              <p className="eyebrow">FICTIONAL DEMO TITLE</p>
-              <p>
-                {overlay.genre} · {overlay.type} · {overlay.time}
-              </p>
-              <p>{overlay.synopsis}</p>
-              <p>Streaming availability unverified.</p>
-            </div>
-          </div>
+          <TitleDetails
+            key={overlay.id}
+            title={overlay}
+            country={profile.country}
+          />
           <div className="actions">
             <button
               className="button primary"

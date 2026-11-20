@@ -132,3 +132,94 @@ for (const [name, path] of browsers) {
     },
   );
 }
+
+test(
+  "configured catalogue UI uses provider responses and keeps earlier saves",
+  { skip: !existsSync(browsers[0][1]) },
+  async () => {
+    const browser = await chromium.launch({ executablePath: browsers[0][1] });
+    try {
+      const page = await browser.newPage({ reducedMotion: "reduce" });
+      await page.addInitScript(() => {
+        globalThis.localStorage.setItem("sg-phase1-saved", '["orbit"]');
+        globalThis.localStorage.setItem(
+          "sg-phase1-profile",
+          '{"name":"Guest","country":"Ireland","genres":[]}',
+        );
+      });
+      const film = {
+        id: "tmdb-movie-1",
+        name: "Provider Fixture",
+        genre: "Drama",
+        type: "Film",
+        releaseDate: "2020-01-01",
+      };
+      await page.route("**/api/catalogue**", async (request) => {
+        const endpoint = new globalThis.URL(request.request().url());
+        let json;
+        if (endpoint.pathname.endsWith("/status")) json = { enabled: true };
+        else if (endpoint.pathname.endsWith("/availability")) {
+          assert.equal(endpoint.searchParams.get("country"), "ie");
+          json = {
+            state: "checked",
+            checkedAt: "2026-11-20T10:00:00Z",
+            offers: [
+              { service: "Fixture Streaming", type: "subscription" },
+              {
+                service: "Fixture Streaming",
+                type: "addon",
+                addon: "Extra Channel",
+              },
+            ],
+          };
+        } else if (endpoint.pathname.endsWith(film.id))
+          json = {
+            title: {
+              ...film,
+              time: "102 min",
+              synopsis: "A provider response fixture.",
+            },
+          };
+        else if (endpoint.searchParams.has("q")) {
+          assert.equal(endpoint.searchParams.get("q"), "Fixture");
+          json = { titles: [film] };
+        } else json = { titles: [film] };
+        await request.fulfill({ json });
+      });
+      await page.goto(url);
+      await page
+        .getByRole("button", { name: "View Provider Fixture" })
+        .waitFor();
+      await page
+        .locator(".hero")
+        .getByRole("button", { name: "Roll the Dice" })
+        .click();
+      let dialog = page.getByRole("dialog");
+      await dialog.getByRole("button", { name: "Roll the Dice" }).click();
+      await dialog.getByRole("heading", { name: "Provider Fixture" }).waitFor();
+      await page.keyboard.press("Escape");
+      await page.getByRole("button", { name: /Spin to Watch/ }).click();
+      await dialog.getByRole("button", { name: "Spin the wheel" }).click();
+      await dialog.getByRole("button", { name: "View details" }).click();
+      dialog = page.getByRole("dialog");
+      await dialog.getByText(/102 min/).waitFor();
+      await dialog
+        .getByText("Included with the service subscription")
+        .waitFor();
+      await dialog.getByText("Additional paid channel").waitFor();
+      await page.keyboard.press("Escape");
+      await page
+        .getByRole("navigation", { name: "Main navigation" })
+        .getByRole("link", { name: "My Watchlist" })
+        .click();
+      await page.getByRole("button", { name: "View Last Orbit" }).waitFor();
+      await page.getByRole("searchbox").fill("Fixture");
+      await page.getByRole("heading", { name: "Discover" }).waitFor();
+      await page
+        .getByRole("button", { name: "View Provider Fixture" })
+        .waitFor();
+    } finally {
+      await browser.close();
+    }
+  },
+);

@@ -2,7 +2,7 @@
 
 **LESS SCROLLING. MORE WATCHING.**
 
-Stream Guide is a film and television discovery prototype. Phase 1 runs locally with a fictional catalogue. Phase 2 requires the owner's approval.
+Stream Guide is a film and television discovery prototype. It runs locally with a fictional catalogue until the owner enables permitted provider access. Phase 3 requires the owner's approval.
 
 - [Product specification](PRODUCT_SPEC.md)
 - [Development roadmap](ROADMAP.md)
@@ -10,6 +10,7 @@ Stream Guide is a film and television discovery prototype. Phase 1 runs locally 
 - [Development instructions](AGENTS.md)
 - [Changelog](CHANGELOG.md)
 - [Environment template](.env.example)
+- [Data provider decisions and local setup](DATA_PROVIDERS.md)
 
 ## Open the local website
 

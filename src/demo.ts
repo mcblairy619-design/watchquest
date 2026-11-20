@@ -66,6 +66,4 @@ export const titles = [
       "An amateur radio club discovers a broadcast from the following day.",
   },
 ] as const;
-export type Title = (typeof titles)[number];
 export const genres = [...new Set(titles.map((title) => title.genre))];
-export const weekly = titles;

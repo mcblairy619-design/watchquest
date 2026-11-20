@@ -1,8 +1,16 @@
 # Progress and asset audit
 
+## Phase 2 · 20 November 2026
+
+- Phase 1 approved. Added opt-in TMDB metadata and a Movie of the Night country-offer adapter. Search, weekly picks, Roll the Dice and Spin to Watch use the configured catalogue. Earlier saves, viewing history and profile settings retain their original browser keys.
+- Streaming offers distinguish base subscriptions, rent, buy, paid channels and free viewing. Unsupported countries, upstream failures and absent provider data use explicit unknown or empty states.
+- The default preview remains labelled demo mode. No real credentials were available in the project, so the integration was exercised with simulated upstream and browser API responses. Live metadata, artwork rights and service availability still need an owner-authorised check. See [provider setup and commercial decisions](DATA_PROVIDERS.md).
+- Lint, TypeScript and production build passed. Browser tests passed on desktop and phone-sized Chrome and Edge, with a simulated configured-catalogue flow on Chrome. Physical iPhone Safari remains unverified.
+- Phase 3 is awaiting approval.
+
 ## Phase 1 · 20 November 2026
 
-Phase 0 approved. Git for Windows 2.56.1 became available and the initial documentation checkpoint is `8c58584`. Git checkpoint writes were authorised outside the restricted shell. Phase 2 is awaiting owner approval.
+Phase 0 approved. Git for Windows 2.56.1 became available and the initial documentation checkpoint is `8c58584`. Git checkpoint writes were authorised outside the restricted shell. Phase 1 was approved after checkpoint `2864cef`.
 
 - Built the responsive React, TypeScript and Vite foundation with Home, Discover, My Watchlist, Community, Profile, Achievements and Premium. The mobile Profile page links to Achievements and Premium.
 - Added a weekly demo pick list, search, genre filters, title details, saves, watched status, Roll the Dice and the equal-chance Spin to Watch wheel for unwatched weekly films. Guest onboarding stores display name, country and genre choices locally. Match scores and the discussion are fictional samples. Preferences and watched state are specific to this browser.
