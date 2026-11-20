@@ -1,0 +1,16 @@
+# Local originals and private development assets
+/branding/
+/source-assets/
+/private-assets/
+
+# Environment values
+.env
+.env.*
+!.env.example
+
+# Local dependencies and generated output
+node_modules/
+dist/
+coverage/
+*.local
+npm-debug.log*
