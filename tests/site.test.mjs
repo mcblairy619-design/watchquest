@@ -153,40 +153,57 @@ test(
         genre: "Drama",
         type: "Film",
         releaseDate: "2020-01-01",
+        source: "movie-of-the-night",
+        time: "102 min",
+        availability: {
+          country: "ie",
+          state: "checked",
+          checkedAt: new Date().toISOString(),
+          offers: [
+            {
+              service: "Fixture Streaming",
+              serviceId: "netflix",
+              type: "subscription",
+            },
+            {
+              service: "Fixture Streaming",
+              serviceId: "netflix",
+              type: "addon",
+              addon: "Extra Channel",
+            },
+          ],
+        },
       };
       await page.route("**/api/catalogue**", async (request) => {
         const endpoint = new globalThis.URL(request.request().url());
         let json;
         if (endpoint.pathname.endsWith("/status")) json = { enabled: true };
-        else if (endpoint.pathname.endsWith("/availability")) {
+        else {
           assert.equal(endpoint.searchParams.get("country"), "ie");
+          if (endpoint.searchParams.has("q"))
+            assert.equal(endpoint.searchParams.get("q"), "Fixture");
           json = {
-            state: "checked",
-            checkedAt: "2026-11-20T10:00:00Z",
-            offers: [
-              { service: "Fixture Streaming", type: "subscription" },
-              {
-                service: "Fixture Streaming",
-                type: "addon",
-                addon: "Extra Channel",
-              },
-            ],
+            titles:
+              endpoint.searchParams.get("services") === "netflix" ? [film] : [],
           };
-        } else if (endpoint.pathname.endsWith(film.id))
-          json = {
-            title: {
-              ...film,
-              time: "102 min",
-              synopsis: "A provider response fixture.",
-            },
-          };
-        else if (endpoint.searchParams.has("q")) {
-          assert.equal(endpoint.searchParams.get("q"), "Fixture");
-          json = { titles: [film] };
-        } else json = { titles: [film] };
+        }
         await request.fulfill({ json });
       });
       await page.goto(url);
+      await page
+        .getByRole("button", { name: "Set viewing country and subscriptions" })
+        .click();
+      const setup = page.getByRole("dialog");
+      await setup.getByRole("button", { name: "Continue as guest" }).click();
+      await setup.getByRole("button", { name: "Netflix", exact: true }).click();
+      await setup
+        .getByRole("button", { name: "Continue", exact: true })
+        .click();
+      await setup.getByRole("button", { name: "Save preferences" }).click();
+      await page
+        .getByRole("navigation", { name: "Main navigation" })
+        .getByRole("link", { name: "Home" })
+        .click();
       await page
         .getByRole("button", { name: "View Provider Fixture" })
         .waitFor();
@@ -214,6 +231,7 @@ test(
         .click();
       await page.getByRole("button", { name: "View Last Orbit" }).waitFor();
       await page.getByRole("searchbox").fill("Fixture");
+      await page.getByRole("button", { name: "Submit search" }).click();
       await page.getByRole("heading", { name: "Discover" }).waitFor();
       await page
         .getByRole("button", { name: "View Provider Fixture" })

@@ -1,4 +1,5 @@
 import { URL, URLSearchParams } from "node:url";
+import { freeRequestBudget } from "./request-budget.mjs";
 
 const TMDB = "https://api.themoviedb.org/3";
 const STREAMING = "https://api.movieofthenight.com/v4";
@@ -13,7 +14,7 @@ class ProviderError extends Error {
   }
 }
 
-function createClient(base, headers, fetcher, limits) {
+function createClient(base, headers, fetcher, limits, reserve = () => 0) {
   const cache = new Map();
   let coolingUntil = 0;
   let active = 0;
@@ -44,6 +45,8 @@ function createClient(base, headers, fetcher, limits) {
       }
     }
     if (budgetWait) throw new ProviderError(429, Math.ceil(budgetWait / 1000));
+    const quotaWait = reserve();
+    if (quotaWait) throw new ProviderError(429, quotaWait);
     for (const window of windows) window.calls.push(now);
     if (cache.size >= 256) {
       const evictable = [...cache].find(([, entry]) => !entry.active);
@@ -58,14 +61,16 @@ function createClient(base, headers, fetcher, limits) {
           signal: globalThis.AbortSignal.timeout(8000),
           redirect: "error",
         });
-        if (response.status === 429) {
+        if ([402, 429].includes(response.status)) {
           const raw = response.headers.get("Retry-After");
           const seconds = /^\d+$/.test(raw ?? "")
             ? Number(raw)
             : (Date.parse(raw) - Date.now()) / 1000;
           const retry = Number.isFinite(seconds)
             ? Math.max(1, Math.ceil(seconds))
-            : 60;
+            : response.status === 402
+              ? 3600
+              : 60;
           coolingUntil = Date.now() + retry * 1000;
           throw new ProviderError(429, retry);
         }
@@ -131,10 +136,19 @@ function toOffers(options) {
   const offers = [];
   const seen = new Set();
   for (const option of options) {
-    if (!offerTypes.has(option?.type) || !option.service?.name) continue;
+    if (
+      !offerTypes.has(option?.type) ||
+      !option.service?.name ||
+      (option.expiresOn && option.expiresOn * 1000 <= Date.now())
+    )
+      continue;
     const type = option.addon ? "addon" : option.type;
     const offer = {
       type,
+      serviceId: option.service.id,
+      expiresAt: Number.isFinite(option.expiresOn)
+        ? option.expiresOn * 1000
+        : undefined,
       service: option.service.name,
       addon: option.addon?.name,
       link: secureLink(option.videoLink) ?? secureLink(option.link),
@@ -146,13 +160,72 @@ function toOffers(options) {
   return offers;
 }
 
-export function createCatalogue(env, fetcher = globalThis.fetch) {
-  const enabled =
+function regionalOffers(show, country) {
+  if (
+    !regions.has(country) ||
+    !show?.streamingOptions ||
+    typeof show.streamingOptions !== "object" ||
+    Array.isArray(show.streamingOptions)
+  )
+    return;
+  const options = show.streamingOptions[country];
+  if (options === undefined) return [];
+  if (Array.isArray(options)) return toOffers(options);
+}
+
+function fromStreaming(show) {
+  if (
+    !show ||
+    !["movie", "series"].includes(show.showType) ||
+    typeof show.title !== "string" ||
+    !show.title
+  )
+    return;
+  const film = show.showType === "movie";
+  const match = /^(movie|tv)\/(\d{1,12})$/.exec(show.tmdbId ?? "");
+  const id =
+    match && match[1] === (film ? "movie" : "tv")
+      ? "tmdb-" + match[1] + "-" + match[2]
+      : /^[a-zA-Z0-9_-]{1,80}$/.test(show.id ?? "")
+        ? "motn-" + show.id
+        : undefined;
+  if (!id) return;
+  const genres = (Array.isArray(show.genres) ? show.genres : [])
+    .map((genre) => genre?.name)
+    .filter((name) => typeof name === "string");
+  const year = film ? show.releaseYear : show.firstAirYear;
+  return {
+    id,
+    name: show.title,
+    type: film ? "Film" : "Series",
+    genres,
+    genre: genres[0] ?? "Unclassified",
+    synopsis: typeof show.overview === "string" ? show.overview : undefined,
+    time:
+      film && Number.isFinite(show.runtime) && show.runtime > 0
+        ? show.runtime + " min"
+        : undefined,
+    releaseDate: Number.isInteger(year) ? String(year) : undefined,
+    source: "movie-of-the-night",
+  };
+}
+
+export function createCatalogue(env, fetcher = globalThis.fetch, budgetPath) {
+  const tmdbEnabled =
     env.CATALOGUE_USE === "non-commercial" && Boolean(env.CATALOGUE_API_TOKEN);
+  const limit = Number(env.AVAILABILITY_FREE_REQUEST_LIMIT);
   const available =
-    enabled &&
     env.AVAILABILITY_TERMS_ACCEPTED === "yes" &&
+    env.AVAILABILITY_FREE_PLAN === "yes" &&
+    Number.isInteger(limit) &&
+    limit > 0 &&
+    limit <= 450 &&
     Boolean(env.AVAILABILITY_API_TOKEN);
+  const cacheMinutes = Number(env.AVAILABILITY_CACHE_MINUTES);
+  const ttl =
+    Number.isInteger(cacheMinutes) && cacheMinutes > 0
+      ? Math.min(cacheMinutes, 360) * 60000
+      : 0;
   const posters = env.CATALOGUE_POSTERS_ALLOWED === "yes";
   const tmdb = createClient(
     TMDB,
@@ -164,75 +237,80 @@ export function createCatalogue(env, fetcher = globalThis.fetch) {
     STREAMING,
     { "X-API-Key": env.AVAILABILITY_API_TOKEN },
     fetcher,
-    [
-      [6, 60000],
-      [50, 24 * hour],
-    ],
+    [[6, 60000]],
+    available ? freeRequestBudget(limit, budgetPath) : undefined,
   );
 
   return async (url) => {
-    if (url.pathname === "/api/catalogue/status") return { enabled };
-    if (!enabled) throw new ProviderError(503);
+    if (url.pathname === "/api/catalogue/status")
+      return { enabled: available, tmdb: tmdbEnabled };
+    const country = url.searchParams.get("country");
+    const validCountry = regions.has(country);
+    const lookup = (id) =>
+      streaming(
+        "/shows/" +
+          encodeURIComponent(id) +
+          (validCountry ? "?" + params({ country }) : ""),
+        ttl,
+      );
 
     if (url.pathname === "/api/catalogue") {
       const query = (url.searchParams.get("q") ?? "").trim().toLowerCase();
-      const country = url.searchParams.get("country");
-      const region = regions.has(country) ? country.toUpperCase() : undefined;
       if (query.length > 100) throw new ProviderError(400);
-      const categories = ["movie", "tv"];
-      const genreRequests = categories.map((kind) =>
-        tmdb("/genre/" + kind + "/list?language=en", 24 * hour),
-      );
-      const contentRequests = query
-        ? [
-            tmdb(
-              "/search/multi?" +
-                params({ query, include_adult: "false", language: "en-GB" }),
-              15 * 60000,
-            ),
-          ]
-        : categories.map((kind) => {
-            const filters = {
-              include_adult: "false",
-              language: "en-GB",
-              sort_by: "popularity.desc",
-            };
-            if (kind === "movie" && region) filters.region = region;
-            return tmdb("/discover/" + kind + "?" + params(filters), 6 * hour);
+      if (!available) throw new ProviderError(503);
+      const services = [
+        ...new Set(
+          (url.searchParams.get("services") ?? "").split(",").filter(Boolean),
+        ),
+      ].sort();
+      if (
+        services.length > 12 ||
+        services.some((service) => !/^[a-z0-9_-]{1,32}$/.test(service))
+      ) {
+        throw new ProviderError(400);
+      }
+      if (!validCountry || !services.length) return { titles: [] };
+      const route = query
+        ? "/shows/search/title?" + params({ country, title: query })
+        : "/shows/search/filters?" +
+          params({
+            country,
+            catalogs: services
+              .map((service) => service + ".subscription")
+              .join(","),
+            order_by: "popularity_1week",
           });
-      const [genreLists, content] = await Promise.all([
-        Promise.all(genreRequests),
-        Promise.all(contentRequests),
-      ]);
-      const names = new Map(
-        genreLists.flatMap(({ data }) =>
-          data.genres.map(({ id, name }) => [id, name]),
-        ),
-      );
-      return {
-        titles: content.flatMap(({ data }, i) =>
-          data.results.flatMap((item) => {
-            const kind = query ? item.media_type : categories[i];
-            if (
-              !categories.includes(kind) ||
-              item.adult ||
-              !Number.isSafeInteger(item.id) ||
-              !(kind === "movie" ? item.title : item.name)
-            )
-              return [];
-            return [titleFrom(item, kind, names, posters)];
-          }),
-        ),
-      };
+      const { data, checkedAt } = await streaming(route, ttl);
+      const shows = query ? data : data.shows;
+      if (!Array.isArray(shows)) throw new ProviderError(502);
+      const titles = new Map();
+      for (const show of shows) {
+        const title = fromStreaming(show);
+        const offers = regionalOffers(show, country);
+        if (
+          title &&
+          offers?.some(
+            (offer) =>
+              offer.type === "subscription" &&
+              services.includes(offer.serviceId),
+          )
+        ) {
+          titles.set(title.id, {
+            ...title,
+            availability: { state: "checked", country, checkedAt, offers },
+          });
+        }
+      }
+      return { titles: [...titles.values()] };
     }
 
     const match =
-      /^\/api\/catalogue\/(tmdb-(movie|tv)-(\d{1,12}))(\/availability)?$/.exec(
+      /^\/api\/catalogue\/(?:(tmdb-(movie|tv)-(\d{1,12}))|motn-([a-zA-Z0-9_-]{1,80}))(\/availability)?$/.exec(
         url.pathname,
       );
     if (!match) throw new ProviderError(404);
-    const [, , kind, id, availability] = match;
-    if (!availability) {
+    const [, , kind, id, nativeId, availability] = match;
+    if (!availability && !available && kind && tmdbEnabled) {
       const { data } = await tmdb(
         "/" + kind + "/" + id + "?language=en-GB",
         24 * hour,
@@ -240,25 +318,34 @@ export function createCatalogue(env, fetcher = globalThis.fetch) {
       if (data.adult) throw new ProviderError(404);
       return { title: titleFrom(data, kind, new Map(), posters) };
     }
-    const country = url.searchParams.get("country");
-    if (!regions.has(country)) return { state: "unsupported" };
-    if (!available) return { state: "unconfigured" };
+    if (!available) {
+      if (availability) return { state: "unconfigured" };
+      throw new ProviderError(503);
+    }
+    if (availability && !validCountry) return { state: "unsupported" };
     try {
-      const { data, checkedAt } = await streaming(
-        "/shows/" +
-          encodeURIComponent(kind + "/" + id) +
-          "?" +
-          params({ country }),
-        6 * hour,
-      );
-      if (!data.streamingOptions || typeof data.streamingOptions !== "object")
-        throw new ProviderError(502);
-      const options = data.streamingOptions[country];
-      if (options !== undefined && !Array.isArray(options))
-        throw new ProviderError(502);
-      return { state: "checked", checkedAt, offers: toOffers(options ?? []) };
+      const { data, checkedAt } = await lookup(nativeId ?? kind + "/" + id);
+      const offers = regionalOffers(data, country);
+      if (availability)
+        return offers
+          ? { state: "checked", checkedAt, offers }
+          : { state: "unknown" };
+      const title = fromStreaming(data);
+      if (!title) throw new ProviderError(502);
+      return {
+        title: {
+          ...title,
+          id: match[1] ?? "motn-" + nativeId,
+          availability: offers && {
+            state: "checked",
+            country,
+            checkedAt,
+            offers,
+          },
+        },
+      };
     } catch (error) {
-      if (error.status === 404) return { state: "unknown" };
+      if (availability && error.status === 404) return { state: "unknown" };
       throw error;
     }
   };

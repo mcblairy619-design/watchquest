@@ -10,6 +10,7 @@
 
 # Local dependencies and generated output
 node_modules/
+/.movieofthenight-usage.json*
 dist/
 coverage/
 *.local

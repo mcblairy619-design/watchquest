@@ -13,6 +13,8 @@ export type Title = {
   score?: number;
   art?: string;
   poster?: string;
+  source?: "movie-of-the-night";
+  availability?: CheckedAvailability & { country: string };
 };
 
 export const countries: Record<string, string> = {
@@ -22,6 +24,15 @@ export const countries: Record<string, string> = {
   Canada: "ca",
   Australia: "au",
 };
+
+export const subscriptionServices = [
+  ["netflix", "Netflix"],
+  ["prime", "Prime Video"],
+  ["disney", "Disney+"],
+  ["apple", "Apple TV"],
+  ["mubi", "MUBI"],
+  ["paramount", "Paramount+"],
+] as const;
 
 export function useCatalogueRequest<T>(path: string | undefined, delay = 0) {
   const [result, setResult] = useState<{
@@ -95,10 +106,43 @@ type Offer = {
   service: string;
   addon?: string;
   link?: string;
+  serviceId?: string;
+  expiresAt?: number;
+};
+type CheckedAvailability = {
+  state: "checked";
+  checkedAt: string;
+  offers: Offer[];
 };
 type AvailabilityData =
-  | { state: "checked"; checkedAt: string; offers: Offer[] }
-  | { state: "unsupported" | "unconfigured" | "unknown" };
+  CheckedAvailability | { state: "unsupported" | "unconfigured" | "unknown" };
+
+export function hasFreshOffers(title: Title, region: string, now: number) {
+  const availability = title.availability;
+  return (
+    !!availability &&
+    availability.country === region &&
+    now - Date.parse(availability.checkedAt) < 6 * 3600000
+  );
+}
+
+export function includedWith(
+  title: Title,
+  region: string,
+  services: string[],
+  now: number,
+) {
+  return (
+    hasFreshOffers(title, region, now) &&
+    title.availability?.offers.some(
+      (offer) =>
+        offer.type === "subscription" &&
+        !!offer.serviceId &&
+        services.includes(offer.serviceId) &&
+        (!offer.expiresAt || offer.expiresAt > now),
+    )
+  );
+}
 
 export function Availability({
   title,
@@ -108,8 +152,12 @@ export function Availability({
   country: string;
 }) {
   const region = countries[country];
+  const now = Date.now();
+  const embedded = hasFreshOffers(title, region, now)
+    ? title.availability
+    : undefined;
   const request = useCatalogueRequest<AvailabilityData>(
-    title.score === undefined && region
+    title.score === undefined && region && !embedded
       ? "/api/catalogue/" + title.id + "/availability?country=" + region
       : undefined,
   );
@@ -128,18 +176,21 @@ export function Availability({
         </button>
       </p>
     );
-  const data = request.data;
+  const data = embedded ?? request.data;
   if (data?.state !== "checked")
     return <p>Streaming availability is unverified for {country}.</p>;
+  const offers = data.offers.filter(
+    (offer) => !offer.expiresAt || offer.expiresAt > now,
+  );
   return (
     <section className="availability" aria-label="Streaming availability">
       <h3>Where to watch in {country}</h3>
       {title.type === "Series" && (
         <p>Series-level listings. Individual seasons may vary.</p>
       )}
-      {data.offers.length ? (
+      {offers.length ? (
         <ul>
-          {data.offers.map((offer, index) => (
+          {offers.map((offer, index) => (
             <li key={index}>
               <strong>
                 {offer.service}

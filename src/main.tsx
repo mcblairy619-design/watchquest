@@ -30,7 +30,9 @@ import { genres as demoGenres, titles as demoTitles } from "./demo";
 import {
   Availability,
   countries,
+  includedWith,
   Poster,
+  subscriptionServices,
   useCatalogueRequest,
 } from "./catalogue";
 import type { Title } from "./catalogue";
@@ -46,7 +48,12 @@ const pages = [
   { id: "premium", name: "Premium", icon: Crown },
 ] as const;
 type Page = (typeof pages)[number];
-type Profile = { name: string; country: string; genres: string[] };
+type Profile = {
+  name: string;
+  country: string;
+  genres: string[];
+  subscriptions?: Record<string, string[]>;
+};
 type Overlay =
   "dice" | "spin" | "onboard" | "notifications" | "credits" | Title;
 const defaultProfile: Profile = {
@@ -112,15 +119,19 @@ function Modal({
 
 function Onboarding({
   profile,
+  live,
   save,
   close,
 }: {
   profile: Profile;
+  live: boolean;
   save: (value: Profile) => void;
   close: () => void;
 }) {
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState(profile);
+  const region = countries[draft.country];
+  const selected = draft.subscriptions?.[region] ?? [];
   return (
     <Modal title="Set up your Movie DNA" close={close}>
       <p className="eyebrow">STEP {step + 1} OF 3</p>
@@ -174,7 +185,40 @@ function Onboarding({
               ))}
             </select>
           </label>
-          <p>Country is saved for future availability checks.</p>
+          {live && region ? (
+            <fieldset>
+              <legend>Your subscriptions in {draft.country}</legend>
+              <p>
+                Select services you already pay for. Paid add-on channels are
+                excluded.
+              </p>
+              <div className="chips">
+                {subscriptionServices.map(([id, name]) => (
+                  <button
+                    key={id}
+                    className="chip"
+                    type="button"
+                    aria-pressed={selected.includes(id)}
+                    onClick={() =>
+                      setDraft({
+                        ...draft,
+                        subscriptions: {
+                          ...draft.subscriptions,
+                          [region]: selected.includes(id)
+                            ? selected.filter((item) => item !== id)
+                            : [...selected, id],
+                        },
+                      })
+                    }
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+          ) : (
+            <p>Country is saved for availability checks.</p>
+          )}
         </div>
       )}
       {step === 2 && (
@@ -250,16 +294,23 @@ function RequestMessage({
 
 function SavedEntry({
   id,
+  country,
   render,
   remove,
 }: {
   id: string;
+  country: string;
   render: (title: Title) => ReactNode;
   remove: () => void;
 }) {
   const demo = demoTitles.find((title) => title.id === id);
   const request = useCatalogueRequest<{ title: Title }>(
-    demo ? undefined : "/api/catalogue/" + encodeURIComponent(id),
+    demo
+      ? undefined
+      : "/api/catalogue/" +
+          encodeURIComponent(id) +
+          "?country=" +
+          (countries[country] ?? ""),
   );
   const title = demo ?? request.data?.title;
   if (title) return render(title);
@@ -275,7 +326,9 @@ function SavedEntry({
 
 function TitleDetails({ title, country }: { title: Title; country: string }) {
   const detail = useCatalogueRequest<{ title: Title }>(
-    title.score === undefined ? "/api/catalogue/" + title.id : undefined,
+    title.score === undefined && !title.source
+      ? "/api/catalogue/" + title.id
+      : undefined,
   );
   const item = detail.data?.title ?? title;
   return (
@@ -318,6 +371,8 @@ function App() {
   const [watched, setWatched] = useLocal<string[]>("watched", []);
   const [profile, setProfile] = useLocal("profile", defaultProfile);
   const [query, setQuery] = useState("");
+  const [submitted, setSubmitted] = useState("");
+  const [clock, setClock] = useState(Date.now);
   const [genre, setGenre] = useState("All");
   const [overlay, setOverlay] = useState<Overlay>();
   const [result, setResult] = useState<Title>();
@@ -327,32 +382,50 @@ function App() {
   const spinTimer = useRef<number | undefined>(undefined);
   const search = useRef<HTMLInputElement>(null);
   const main = useRef<HTMLElement>(null);
-  const status = useCatalogueRequest<{ enabled: boolean }>(
+  const status = useCatalogueRequest<{ enabled: boolean; tmdb?: boolean }>(
     "/api/catalogue/status",
   );
   const live = status.data?.enabled === true;
+  useEffect(() => {
+    if (!live) return;
+    const timer = window.setInterval(() => setClock(Date.now()), 30000);
+    return () => window.clearInterval(timer);
+  }, [live]);
   const region = countries[profile.country] ?? "";
-  const cataloguePath = "/api/catalogue?country=" + region;
+  const services = profile.subscriptions?.[region] ?? [];
+  const cataloguePath =
+    "/api/catalogue?country=" +
+    region +
+    "&services=" +
+    encodeURIComponent([...services].sort().join(","));
   const catalogue = useCatalogueRequest<{ titles: Title[] }>(
     live ? cataloguePath : undefined,
   );
   const searchPath =
-    live && page === "discover" && query.trim()
-      ? cataloguePath + "&q=" + encodeURIComponent(query.trim())
+    live && page === "discover" && submitted
+      ? cataloguePath + "&q=" + encodeURIComponent(submitted)
       : undefined;
   const searchResults = useCatalogueRequest<{ titles: Title[] }>(
     searchPath,
     350,
   );
+  const eligibleNow = (title: Title, now: number) =>
+    !live || includedWith(title, region, services, now);
   const titles: readonly Title[] = live
-    ? (catalogue.data?.titles ?? [])
+    ? (catalogue.data?.titles ?? []).filter((title) =>
+        eligibleNow(title, clock),
+      )
     : demoTitles;
   const weekly = [
     ...titles.filter((title) => title.type === "Film").slice(0, 5),
     ...titles.filter((title) => title.type === "Series").slice(0, 1),
   ];
   const browseRequest = searchPath ? searchResults : catalogue;
-  const browse = searchPath ? (searchResults.data?.titles ?? []) : titles;
+  const browse = searchPath
+    ? (searchResults.data?.titles ?? []).filter((title) =>
+        eligibleNow(title, clock),
+      )
+    : titles;
   const genres = [
     ...new Set(browse.flatMap((title) => title.genres ?? [title.genre])),
   ];
@@ -402,13 +475,12 @@ function App() {
   );
   const dicePool = titles.filter((title) => !watched.includes(title.id));
   function rollDice() {
-    const unrolled = dicePool.filter(
-      (title) => !diceHistory.includes(title.id),
-    );
+    const current = dicePool.filter((title) => eligibleNow(title, Date.now()));
+    const unrolled = current.filter((title) => !diceHistory.includes(title.id));
     const pool = unrolled.length
       ? unrolled
-      : dicePool.filter(
-          (title) => dicePool.length === 1 || title.id !== result?.id,
+      : current.filter(
+          (title) => current.length === 1 || title.id !== result?.id,
         );
     const next = pool[Math.floor(Math.random() * pool.length)];
     if (next) {
@@ -418,6 +490,10 @@ function App() {
   }
   function spinWheel() {
     if (spinning || !spinPool.length) return;
+    if (spinPool.some((title) => !eligibleNow(title, Date.now()))) {
+      setClock(Date.now());
+      return;
+    }
     const index = Math.floor(Math.random() * spinPool.length);
     const angle = 360 - ((index + 0.5) * 360) / spinPool.length;
     const next = (Math.floor(turn / 360) + 4) * 360 + angle;
@@ -536,13 +612,14 @@ function App() {
             </span>
           </a>
           <span className="prototype">
-            <span></span> {live ? "TMDB catalogue" : "Demo catalogue"}
+            <span></span> {live ? "Live catalogue" : "Demo catalogue"}
           </span>
           <form
             className="search"
             role="search"
             onSubmit={(event) => {
               event.preventDefault();
+              setSubmitted(query.trim());
               setGenre("All");
               location.hash = "discover";
             }}
@@ -562,9 +639,19 @@ function App() {
               onChange={(event) => {
                 setQuery(event.target.value);
                 setGenre("All");
-                if (page !== "discover") location.hash = "discover";
+                if (!event.target.value) setSubmitted("");
+                if (!live && page !== "discover") location.hash = "discover";
               }}
             />
+            {live && (
+              <button
+                type="submit"
+                className="icon-button"
+                aria-label="Submit search"
+              >
+                <ArrowRight size={17} />
+              </button>
+            )}
           </form>
           <button
             className="icon-button top-icon"
@@ -623,7 +710,7 @@ function App() {
                     <h2>This Week’s Watchlist</h2>
                     <p>
                       {live
-                        ? "Popular films and series. Open a title to check where it streams."
+                        ? "Popular titles included with your selected subscriptions."
                         : "Five films and one series from the fictional demo catalogue."}
                     </p>
                   </div>
@@ -638,11 +725,21 @@ function App() {
                   </a>
                 </div>
                 <RequestMessage {...catalogue} />
+                {live && (!region || !services.length) && (
+                  <button
+                    className="button secondary"
+                    onClick={() => open("onboard")}
+                  >
+                    Set viewing country and subscriptions
+                  </button>
+                )}
                 {weekly.length
                   ? cards(weekly)
                   : live &&
                     !catalogue.loading &&
-                    !catalogue.error && (
+                    !catalogue.error &&
+                    region &&
+                    services.length > 0 && (
                       <p>No catalogue picks are available.</p>
                     )}
               </section>
@@ -681,7 +778,7 @@ function App() {
               <h1>Discover</h1>
               <p className="intro">
                 {live
-                  ? "Browse films and series. Open a title to check offers in your viewing country."
+                  ? "Browse titles included with your selected subscriptions."
                   : "Browse fictional films and series. Streaming availability is unverified."}
               </p>
               <div className="chips">
@@ -703,7 +800,16 @@ function App() {
               ) : (
                 <div className="panel">
                   <h2>No titles found</h2>
-                  <p>Try a different search or genre.</p>
+                  {live && (!region || !services.length) ? (
+                    <button
+                      className="button secondary"
+                      onClick={() => open("onboard")}
+                    >
+                      Set viewing country and subscriptions
+                    </button>
+                  ) : (
+                    <p>Try a different search or genre.</p>
+                  )}
                   <button
                     className="button secondary"
                     onClick={() => {
@@ -743,6 +849,7 @@ function App() {
                     <SavedEntry
                       key={id}
                       id={id}
+                      country={profile.country}
                       render={card}
                       remove={() => toggleSaved(id)}
                     />
@@ -887,7 +994,9 @@ function App() {
         </main>
         <footer>
           <span>Stream Guide prototype</span>
-          {live && <button onClick={() => open("credits")}>Credits</button>}
+          {(live || status.data?.tmdb) && (
+            <button onClick={() => open("credits")}>Credits</button>
+          )}
           <button onClick={() => open("onboard")}>
             <CircleHelp size={16} /> Get started
           </button>
@@ -904,6 +1013,7 @@ function App() {
       {overlay === "onboard" && (
         <Onboarding
           profile={profile}
+          live={live}
           close={close}
           save={(value) => {
             setProfile(value);
@@ -919,15 +1029,19 @@ function App() {
       )}
       {overlay === "credits" && (
         <Modal title="Credits" close={close}>
-          <a href="https://www.themoviedb.org">
-            <img className="tmdb-logo" src="/media/tmdb.svg" alt="TMDB" />
-          </a>
+          {status.data?.tmdb && (
+            <>
+              <a href="https://www.themoviedb.org">
+                <img className="tmdb-logo" src="/media/tmdb.svg" alt="TMDB" />
+              </a>
+              <p>
+                This product uses the TMDB API but is not endorsed or certified
+                by TMDB.
+              </p>
+            </>
+          )}
           <p>
-            This product uses the TMDB API but is not endorsed or certified by
-            TMDB.
-          </p>
-          <p>
-            Streaming availability information is provided by the{" "}
+            Catalogue and streaming availability are provided by the{" "}
             <a href="https://www.movieofthenight.com/about/api">
               Streaming Availability API by Movie of the Night
             </a>{" "}

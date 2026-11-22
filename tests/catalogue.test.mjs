@@ -1,170 +1,188 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { URL } from "node:url";
 import { createCatalogue } from "../server/catalogue.mjs";
 
 const env = {
-  CATALOGUE_USE: "non-commercial",
-  CATALOGUE_API_TOKEN: "fake-metadata-token",
-  CATALOGUE_POSTERS_ALLOWED: "yes",
   AVAILABILITY_TERMS_ACCEPTED: "yes",
-  AVAILABILITY_API_TOKEN: "fake-availability-token",
+  AVAILABILITY_FREE_PLAN: "yes",
+  AVAILABILITY_FREE_REQUEST_LIMIT: "100",
+  AVAILABILITY_CACHE_MINUTES: "60",
+  AVAILABILITY_API_TOKEN: "fixture-key",
 };
 const route = (path) => new URL("/api/catalogue" + path, "http://localhost");
 const json = (body, init) => globalThis.Response.json(body, init);
+function budget(t) {
+  const folder = mkdtempSync(join(tmpdir(), "sg-provider-"));
+  t.after(() => rmSync(folder, { recursive: true }));
+  return join(folder, "usage.json");
+}
+const offer = (type, id = "netflix", extras = {}) => ({
+  type,
+  service: { id, name: id },
+  ...extras,
+});
+const show = (id, streamingOptions) => ({
+  id: "fixture-" + id,
+  tmdbId: "movie/" + id,
+  showType: "movie",
+  title: "Fixture " + id,
+  genres: [{ name: "Drama" }],
+  overview: "Fixture synopsis",
+  releaseYear: 2020,
+  runtime: 102,
+  streamingOptions,
+  imageSet: { verticalPoster: { w360: "https://example.com/poster.jpg" } },
+});
 
-test("disabled credentials make no upstream calls", async () => {
-  const run = createCatalogue({ CATALOGUE_API_TOKEN: "fake" }, () =>
-    assert.fail(),
+test("disabled accounts make no upstream calls", async (t) => {
+  const run = createCatalogue(
+    { ...env, AVAILABILITY_FREE_PLAN: "" },
+    () => assert.fail(),
+    budget(t),
   );
-  assert.deepEqual(await run(route("/status")), { enabled: false });
+  assert.deepEqual(await run(route("/status")), {
+    enabled: false,
+    tmdb: false,
+  });
   await assert.rejects(run(route("")), { status: 503 });
 });
 
-test("catalogue excludes people, resolves metadata and coalesces concurrent lookups", async () => {
+test("primary listings and search require a current base subscription in the chosen country", async (t) => {
+  const shows = [
+    show(1, {
+      gb: [offer("subscription"), offer("rent"), offer("buy"), offer("addon")],
+    }),
+    show(2, { gb: [offer("rent")], us: [offer("subscription")] }),
+    show(3, { gb: [offer("subscription", "prime")] }),
+    show(4, {
+      gb: [offer("subscription", "netflix", { addon: { name: "Extra" } })],
+    }),
+    show(5, { gb: [offer("subscription", "netflix", { expiresOn: 1 })] }),
+  ];
   const seen = [];
-  const run = createCatalogue(env, async (path, options) => {
-    const url = new URL(path);
-    seen.push(url);
-    assert.equal(url.host, "api.themoviedb.org");
-    assert.equal(options.headers.Authorization, "Bearer fake-metadata-token");
-    assert.ok(!path.includes("fake-metadata-token"));
-    if (url.pathname.includes("/genre/"))
-      return json({ genres: [{ id: 18, name: "Drama" }] });
-    if (url.pathname.includes("/search/"))
-      return json({
-        results: [
-          { media_type: "person", id: 9, name: "Person" },
-          { media_type: "movie", adult: true, id: 8, title: "Adult" },
-          {
-            media_type: "movie",
-            id: 1,
-            title: "Fixture Film",
-            genre_ids: [18],
-            release_date: "2020-01-01",
-            poster_path: "/test.jpg",
-          },
-        ],
-      });
-    if (url.pathname.includes("/discover/"))
-      return json({
-        results: [
-          {
-            id: 4,
-            name: "Fixture Series",
-            title: "Fixture Film",
-            genre_ids: [18],
-            adult: false,
-          },
-        ],
-      });
-    return json({
-      id: 1,
-      title: "Fixture Film",
-      runtime: 102,
-      genres: [{ name: "Drama" }],
-    });
+  const run = createCatalogue(
+    env,
+    async (path, request) => {
+      const url = new URL(path);
+      seen.push(url);
+      assert.equal(url.host, "api.movieofthenight.com");
+      assert.deepEqual(request.headers, { "X-API-Key": "fixture-key" });
+      assert.equal(url.searchParams.get("country"), "gb");
+      return json(url.pathname.endsWith("/title") ? shows : { shows });
+    },
+    budget(t),
+  );
+  assert.deepEqual(await run(route("/status")), { enabled: true, tmdb: false });
+  assert.deepEqual(await run(route("?country=gb")), { titles: [] });
+  assert.deepEqual(await run(route("?country=zz&services=netflix")), {
+    titles: [],
   });
-  assert.deepEqual(await run(route("/status")), { enabled: true });
-  const [first, second] = await Promise.all([
-    run(route("?q=Test")),
-    run(route("?q=test")),
+  const [browse, again] = await Promise.all([
+    run(route("?country=gb&services=netflix")),
+    run(route("?country=gb&services=netflix")),
   ]);
-  assert.deepEqual(first, second);
-  assert.equal(seen.length, 3);
-  assert.equal(first.titles.length, 1);
-  assert.equal(first.titles[0].genre, "Drama");
-  assert.equal(
-    first.titles[0].poster,
-    "https://image.tmdb.org/t/p/w342/test.jpg",
-  );
-  assert.equal(first.titles[0].releaseDate, "2020-01-01");
-  assert.equal(first.titles[0].score, undefined);
-  const popular = await run(route("?country=gb"));
+  assert.deepEqual(browse, again);
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0].searchParams.get("catalogs"), "netflix.subscription");
+  const search = await run(route("?country=gb&services=netflix&q=Fixture"));
   assert.deepEqual(
-    popular.titles.map((title) => title.type),
-    ["Film", "Series"],
+    search.titles.map((title) => title.id),
+    ["tmdb-movie-1"],
   );
-  assert.equal(
-    seen
-      .find((url) => url.pathname.endsWith("/discover/movie"))
-      .searchParams.get("region"),
-    "GB",
+  assert.deepEqual(
+    browse.titles.map((title) => title.id),
+    ["tmdb-movie-1"],
   );
-  assert.equal((await run(route("/tmdb-movie-1"))).title.time, "102 min");
+  const [title] = browse.titles;
+  assert.equal(title.time, "102 min");
+  assert.equal(title.genre, "Drama");
+  assert.equal(title.releaseDate, "2020");
+  assert.equal(title.poster, undefined);
+  assert.deepEqual(
+    title.availability.offers.map((item) => item.type),
+    ["subscription", "rent", "buy", "addon"],
+  );
 });
 
-test("reports only selected country offers and keeps paid channels separate", async () => {
-  const options = ["subscription", "rent", "buy", "addon", "free"].map(
-    (type) => ({
-      type,
-      service: { name: "Fixture service" },
-      link: "https://example.com/" + type,
-    }),
+test("resolves existing saved identifiers without TMDB and coalesces detail and offer lookups", async (t) => {
+  let calls = 0;
+  const run = createCatalogue(
+    env,
+    async (path) => {
+      calls++;
+      assert.equal(
+        decodeURIComponent(new URL(path).pathname),
+        "/v4/shows/movie/1",
+      );
+      return json(
+        show(1, { gb: [offer("rent")], us: [offer("subscription")] }),
+      );
+    },
+    budget(t),
   );
-  options.push({
-    ...options[0],
-    addon: { name: "Paid fixture channel" },
-    link: "javascript:alert(1)",
-  });
-  const run = createCatalogue(env, async (path, request) => {
-    const url = new URL(path);
-    assert.equal(decodeURIComponent(url.pathname), "/v4/shows/tv/1");
-    assert.equal(request.headers["X-API-Key"], "fake-availability-token");
-    if (url.searchParams.get("country") === "au")
-      return json({}, { status: 404 });
-    return json({
-      streamingOptions: {
-        gb: options,
-        us: [{ service: { name: "US fixture" }, type: "rent" }],
-      },
-    });
-  });
-  const gb = await run(route("/tmdb-tv-1/availability?country=gb"));
-  const us = await run(route("/tmdb-tv-1/availability?country=us"));
-  assert.equal(gb.state, "checked");
-  assert.ok(Number.isFinite(Date.parse(gb.checkedAt)));
-  assert.deepEqual(
-    gb.offers.map((offer) => offer.type),
-    ["subscription", "rent", "buy", "addon", "free", "addon"],
-  );
-  assert.equal(gb.offers.at(-1).link, undefined);
-  assert.equal(us.offers[0].service, "US fixture");
   assert.equal(
-    (await run(route("/tmdb-tv-1/availability?country=au"))).state,
-    "unknown",
+    (await run(route("/tmdb-movie-1?country=gb"))).title.id,
+    "tmdb-movie-1",
   );
-  assert.deepEqual(await run(route("/tmdb-tv-1/availability?country=zz")), {
+  const gb = await run(route("/tmdb-movie-1/availability?country=gb"));
+  assert.deepEqual(
+    gb.offers.map(({ type }) => type),
+    ["rent"],
+  );
+  assert.equal(calls, 1);
+  assert.deepEqual(await run(route("/tmdb-movie-1/availability?country=zz")), {
     state: "unsupported",
   });
 });
 
-test("honours Retry-After without retrying or persisting a failed lookup", async () => {
+test("optional TMDB restores legacy metadata independently of primary availability", async (t) => {
+  const run = createCatalogue(
+    { CATALOGUE_USE: "non-commercial", CATALOGUE_API_TOKEN: "legacy" },
+    async (path, options) => {
+      assert.equal(new URL(path).host, "api.themoviedb.org");
+      assert.equal(options.headers.Authorization, "Bearer legacy");
+      return json({ id: 1, title: "Legacy title", runtime: 100 });
+    },
+    budget(t),
+  );
+  assert.deepEqual(await run(route("/status")), { enabled: false, tmdb: true });
+  assert.equal((await run(route("/tmdb-movie-1"))).title.time, "100 min");
+});
+
+test("quota survives restarts and honours Retry-After", async (t) => {
+  const path = budget(t);
+  const limited = { ...env, AVAILABILITY_FREE_REQUEST_LIMIT: "1" };
   let calls = 0;
-  const run = createCatalogue(env, async () => {
+  const upstream = async () => {
     calls++;
     return json({}, { status: 429, headers: { "Retry-After": "20" } });
-  });
+  };
+  const run = createCatalogue(limited, upstream, path);
   const url = route("/tmdb-movie-1/availability?country=gb");
   await assert.rejects(run(url), { status: 429, retryAfter: 20 });
   await assert.rejects(run(url), { status: 429 });
+  await assert.rejects(createCatalogue(limited, upstream, path)(url), {
+    status: 429,
+  });
   assert.equal(calls, 1);
 });
 
-test("availability budget spares the provider and still serves cached results", async () => {
+test("completed responses are fetched again when caching is disabled", async (t) => {
   let calls = 0;
-  const run = createCatalogue(env, async () => {
-    calls++;
-    return json({ streamingOptions: {} });
-  });
-  for (let id = 1; id <= 6; id++) {
-    await run(route("/tmdb-movie-" + id + "/availability?country=gb"));
-  }
-  await assert.rejects(run(route("/tmdb-movie-7/availability?country=gb")), {
-    status: 429,
-  });
-  const cached = await run(route("/tmdb-movie-1/availability?country=gb"));
-  assert.equal(cached.state, "checked");
-  assert.deepEqual(cached.offers, []);
-  assert.equal(calls, 6);
+  const run = createCatalogue(
+    { ...env, AVAILABILITY_CACHE_MINUTES: "0" },
+    async () => {
+      calls++;
+      return json(show(1, {}));
+    },
+    budget(t),
+  );
+  const url = route("/tmdb-movie-1/availability?country=gb");
+  await run(url);
+  await run(url);
+  assert.equal(calls, 2);
 });
