@@ -135,16 +135,29 @@ export function includedWith(
   services: string[],
   now: number,
 ) {
-  return (
-    hasFreshOffers(title, region, now) &&
-    title.availability?.offers.some(
-      (offer) =>
-        offer.type === "subscription" &&
-        !!offer.serviceId &&
-        services.includes(offer.serviceId) &&
-        (!offer.expiresAt || offer.expiresAt > now),
-    )
-  );
+  return includedServices(title, region, services, now).length > 0;
+}
+
+export function includedServices(
+  title: Title,
+  region: string,
+  services: string[],
+  now: number,
+) {
+  if (!hasFreshOffers(title, region, now)) return [];
+  return [
+    ...new Set(
+      title.availability?.offers
+        .filter(
+          (offer) =>
+            offer.type === "subscription" &&
+            !!offer.serviceId &&
+            services.includes(offer.serviceId) &&
+            (!offer.expiresAt || offer.expiresAt > now),
+        )
+        .map((offer) => offer.service),
+    ),
+  ];
 }
 
 export function Availability({

@@ -10,9 +10,9 @@ import {
   CircleHelp,
   Compass,
   Crown,
+  Dna,
   Dices,
   House,
-  Play,
   Search,
   Settings,
   Sparkles,
@@ -31,6 +31,7 @@ import {
   Availability,
   countries,
   includedWith,
+  includedServices,
   Poster,
   subscriptionServices,
   useCatalogueRequest,
@@ -42,9 +43,9 @@ const pages = [
   { id: "home", name: "Home", icon: House },
   { id: "discover", name: "Discover", icon: Compass },
   { id: "watchlist", name: "My Watchlist", icon: Bookmark },
-  { id: "community", name: "Community", icon: Users },
-  { id: "profile", name: "Profile", icon: UserRound },
   { id: "achievements", name: "Achievements", icon: Trophy },
+  { id: "profile", name: "Profile", icon: UserRound },
+  { id: "community", name: "Community", icon: Users },
   { id: "premium", name: "Premium", icon: Crown },
 ] as const;
 type Page = (typeof pages)[number];
@@ -61,6 +62,23 @@ const defaultProfile: Profile = {
   country: "United Kingdom",
   genres: [],
 };
+
+function Brand({ mobile = false }: { mobile?: boolean }) {
+  return (
+    <a
+      className={mobile ? "mobile-brand brand" : "brand"}
+      href="#home"
+      aria-label="WatchQuest home"
+    >
+      <img className="brand-shield" src="/media/watchquest-shield.png" alt="" />
+      <img
+        className="brand-wordmark"
+        src="/media/watchquest-wordmark.png"
+        alt="WatchQuest"
+      />
+    </a>
+  );
+}
 function readLocal<T>(key: string, fallback: T): T {
   try {
     return (
@@ -142,10 +160,14 @@ function Onboarding({
               src="/media/mascot.jpg"
               alt="Founder mascot concept in a dark hoodie"
             />
-            <img className="mascot-logo" src="/media/sg.png" alt="" />
+            <img
+              className="mascot-logo"
+              src="/media/watchquest-shield.png"
+              alt=""
+            />
           </div>
           <div>
-            <h3>Welcome to Stream Guide</h3>
+            <h3>Welcome to WatchQuest</h3>
             <p>
               Pick a viewing country and the genres you enjoy. You can try the
               site as a guest.
@@ -499,8 +521,8 @@ function App() {
   useEffect(() => {
     document.title =
       page === "home"
-        ? "Stream Guide"
-        : pages.find((item) => item.id === page)?.name + " | Stream Guide";
+        ? "WatchQuest"
+        : pages.find((item) => item.id === page)?.name + " | WatchQuest";
   }, [page]);
 
   const toggleSaved = (id: string) =>
@@ -585,7 +607,17 @@ function App() {
           .toLowerCase()
           .includes(query.trim().toLowerCase())),
   );
-  const card = (title: Title) => (
+  const activityTitles = new Map(
+    [...demoTitles, ...titles].map((title) => [title.id, title]),
+  );
+  const recent = watched
+    .slice(-3)
+    .reverse()
+    .flatMap((id) => {
+      const title = activityTitles.get(id);
+      return title ? [title] : [];
+    });
+  const card = (title: Title, showWatched = false) => (
     <article className="card" key={title.id}>
       <button
         className="poster"
@@ -602,26 +634,54 @@ function App() {
         <div>
           <h3>{title.name}</h3>
           <p>
-            {title.genre} · {title.type}
+            {[title.type, title.releaseDate?.slice(0, 4), title.time]
+              .filter(Boolean)
+              .join(" · ")}
           </p>
+          <p>{title.genres?.join(", ") || title.genre}</p>
+          {live &&
+            showWatched &&
+            includedServices(title, region, services, clock).map((service) => (
+              <p key={service} className="card-offer">
+                Included with {service}
+              </p>
+            ))}
         </div>
-        <button
-          className="icon-button"
-          aria-label={
-            saved.includes(title.id)
-              ? "Remove " + title.name + " from watchlist"
-              : "Save " + title.name
-          }
-          aria-pressed={saved.includes(title.id)}
-          onClick={() => toggleSaved(title.id)}
-        >
-          <Bookmark size={17} />
-        </button>
+        <div className="card-controls">
+          <button
+            className="icon-button"
+            aria-label={
+              saved.includes(title.id)
+                ? "Remove " + title.name + " from watchlist"
+                : "Save " + title.name
+            }
+            aria-pressed={saved.includes(title.id)}
+            onClick={() => toggleSaved(title.id)}
+          >
+            <Bookmark size={17} />
+          </button>
+          {showWatched && (
+            <button
+              className="icon-button"
+              aria-pressed={watched.includes(title.id)}
+              aria-label={
+                (watched.includes(title.id)
+                  ? "Mark unwatched: "
+                  : "Mark watched: ") + title.name
+              }
+              onClick={() => toggleWatched(title)}
+            >
+              <Check size={17} />
+            </button>
+          )}
+        </div>
       </div>
     </article>
   );
-  const cards = (items: readonly Title[]) => (
-    <div className="cards">{items.map(card)}</div>
+  const cards = (items: readonly Title[], showWatched = false) => (
+    <div className="cards">
+      {items.map((title) => card(title, showWatched))}
+    </div>
   );
 
   return (
@@ -636,39 +696,19 @@ function App() {
       >
         Skip to content
       </a>
-      <aside className="sidebar">
-        <a className="brand" href="#home">
-          <img src="/media/sg.png" alt="" />{" "}
-          <span>
-            STREAM <b>GUIDE</b>
-          </span>
-        </a>
+      <header className="site-header">
+        <Brand />
         <nav aria-label="Main navigation">
-          {pages.slice(0, 5).map((item) => nav(item))}
-          <div className="nav-divider" />
-          {pages.slice(5).map((item) => nav(item))}
+          {pages.slice(0, 2).map((item) => nav(item))}
+          <button onClick={() => open("onboard")}>
+            <Dna size={19} /> Movie DNA
+          </button>
+          {pages.slice(2).map((item) => nav(item))}
         </nav>
-        <button className="sidebar-setup" onClick={() => open("onboard")}>
-          <Sparkles size={18} />
-          <span>
-            <strong>Movie DNA</strong>
-            <small>
-              {profile.genres.length
-                ? "Edit preferences"
-                : "Set up your taste profile"}
-            </small>
-          </span>
-          <ChevronRight size={16} />
-        </button>
-      </aside>
+      </header>
       <div className="shell">
-        <header className="topbar">
-          <a className="mobile-brand brand" href="#home">
-            <img src="/media/sg.png" alt="" />
-            <span>
-              STREAM <b>GUIDE</b>
-            </span>
-          </a>
+        <div className="topbar">
+          <Brand mobile />
           <span className="prototype">
             <span></span> {live ? "Live catalogue" : "Demo catalogue"}
           </span>
@@ -725,7 +765,7 @@ function App() {
           >
             <UserRound size={18} />
           </a>
-        </header>
+        </div>
         <main id="content" tabIndex={-1} ref={main}>
           {page === "home" && (
             <>
@@ -738,23 +778,22 @@ function App() {
                     <em>MORE WATCHING.</em>
                   </h1>
                   <p>
-                    Find your next favourite film or series. Explore the{" "}
-                    {live ? "catalogue" : "demo catalogue"} and start building
-                    your watchlist.
+                    {live
+                      ? "Explore films and series on your streaming services and build your watchlist."
+                      : "Explore the fictional catalogue and try the weekly picks, watchlist and discovery tools."}
                   </p>
                   <div className="actions">
-                    <a
-                      className="button primary"
-                      href="#discover"
-                      onClick={clearSearch}
-                    >
-                      <Play size={17} /> Find something to watch
-                    </a>
                     <button
-                      className="button secondary"
+                      className="button primary"
                       onClick={() => open("dice")}
                     >
                       <Dices size={19} /> Roll the Dice
+                    </button>
+                    <button
+                      className="button secondary"
+                      onClick={() => open("onboard")}
+                    >
+                      <Dna size={19} /> Movie DNA
                     </button>
                   </div>
                 </div>
@@ -762,7 +801,7 @@ function App() {
               <section className="weekly">
                 <div className="section-head">
                   <div>
-                    <h2>This Week’s Watchlist</h2>
+                    <h2>This Week’s Picks For You</h2>
                     <p>
                       {live
                         ? "Popular titles included with your selected subscriptions."
@@ -783,7 +822,7 @@ function App() {
                   </button>
                 )}
                 {weekly.length
-                  ? cards(weekly)
+                  ? cards(weekly, true)
                   : live &&
                     !catalogue.loading &&
                     !catalogue.error &&
@@ -819,6 +858,59 @@ function App() {
                   </span>
                   <ChevronRight size={18} />
                 </button>
+              </section>
+              <section
+                className="dashboard-activity"
+                aria-label="Your activity"
+              >
+                <div className="panel">
+                  <Bookmark aria-hidden="true" />
+                  <h2>Watchlist</h2>
+                  <p>{saved.length} saved</p>
+                  <a className="button secondary" href="#watchlist">
+                    Open watchlist
+                  </a>
+                </div>
+                <div className="panel">
+                  <Check aria-hidden="true" />
+                  <h2>Recently watched</h2>
+                  {recent.length ? (
+                    <ul>
+                      {recent.map((title) => (
+                        <li key={title.id}>
+                          <button
+                            className="activity-title"
+                            onClick={() => open(title)}
+                          >
+                            {title.name}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p>
+                      {watched.length
+                        ? "Recent titles are outside this catalogue selection."
+                        : "Mark a title as watched to see it here."}
+                    </p>
+                  )}
+                </div>
+                <div className="panel">
+                  <Trophy aria-hidden="true" />
+                  <h2>{profile.name || "Guest viewer"}</h2>
+                  <p>
+                    {Number(firstFilm) + Number(saved.length > 0)} of 2
+                    achievements unlocked
+                  </p>
+                  <progress
+                    aria-label="Achievements unlocked"
+                    value={Number(firstFilm) + Number(saved.length > 0)}
+                    max={2}
+                  />
+                  <a className="button secondary" href="#achievements">
+                    View achievements
+                  </a>
+                </div>
               </section>
             </>
           )}
@@ -987,7 +1079,13 @@ function App() {
                     <Trophy />
                     <h2>{item.name}</h2>
                     <p>{item.desc}</p>
-                    <strong>
+                    <strong
+                      className={
+                        item.done
+                          ? "achievement-status unlocked"
+                          : "achievement-status"
+                      }
+                    >
                       {item.done ? "Unlocked in this demo" : "In progress"}
                     </strong>
                   </div>
@@ -997,7 +1095,7 @@ function App() {
           )}
           {page === "premium" && (
             <>
-              <h1>Stream Guide+</h1>
+              <h1>WatchQuest+</h1>
               <p className="intro">
                 Preview the proposed membership. Sign-ups and payments are
                 disabled.
@@ -1017,8 +1115,8 @@ function App() {
           )}
           {page === "profile" && (
             <div className="mobile-profile-links">
-              <a href="#achievements">
-                <Trophy size={18} /> Achievements
+              <a href="#community">
+                <Users size={18} /> Community
               </a>
               <a href="#premium">
                 <Crown size={18} /> Premium
@@ -1027,7 +1125,10 @@ function App() {
           )}
         </main>
         <footer>
-          <span>Stream Guide prototype</span>
+          <span className="footer-brand">
+            <strong>WatchQuest</strong>
+            <small>FIND • WATCH • RATE • LEVEL UP.</small>
+          </span>
           {(live || status.data?.tmdb) && (
             <button onClick={() => open("credits")}>Credits</button>
           )}

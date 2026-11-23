@@ -1,5 +1,14 @@
 # Progress and asset audit
 
+## Phase 2.2 · WatchQuest
+
+- Verified GitHub `watchquest/main` at the approved Phase 2.1 checkpoint `5d2e294` before the rebrand.
+- The local rebrand uses resized crops of the owner-approved WatchQuest Neon Cinematic Logo for the wordmark, shield, favicon and app icons. The supplied WatchQuest Neon Streaming Design Board is a private visual reference. Film art from the board was excluded. The existing cinematic banner and safe demo artwork remain in use.
+- Weekly picks show current catalogue metadata and verified subscription offers when present, alongside save and watched controls. The dashboard uses existing watch activity and achievements. Numeric levels, XP, leaderboards and personalised ratings remain outside this phase.
+- Existing route hashes, storage keys and title identifiers remain compatible. The free API cap and provider credentials were preserved.
+- Lint, TypeScript, the production build and all nine tests passed. Chrome and Edge covered desktop, tablet, iPhone-sized and Android-sized layouts. The desktop and mobile previews were also reviewed visually. Physical iPhone Safari remains unverified.
+- The recently watched panel can name titles in the currently loaded catalogue or the demo library. Out-of-catalogue history remains stored, and the dashboard does not make extra provider calls for it.
+
 ## Phase 2.1 · 23 November 2026
 
 - Movie of the Night is the primary metadata and regional streaming provider. The previous audit verified a single UK Netflix request without TMDB and received 20 eligible titles. No additional live request was needed for these regression fixes.

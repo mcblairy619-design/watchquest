@@ -1,10 +1,10 @@
-# STREAM GUIDE | MASTER DEVELOPMENT SPECIFICATION
+# WATCHQUEST | MASTER DEVELOPMENT SPECIFICATION
 
 ## 1. YOUR ROLE
 
 Act as my senior software engineer, UI/UX designer, database engineer, security specialist and technical project manager.
 
-I am a beginner developer building Stream Guide using Codex.
+I am a beginner developer building WatchQuest using Codex.
 
 Perform technical tasks autonomously wherever possible. Explain anything requiring my involvement in simple British English.
 
@@ -14,11 +14,13 @@ Ask one focused question at a time when essential decisions are required.
 
 ## 2. PROJECT VISION
 
-Build a professional film and television discovery platform called Stream Guide.
+Build a professional film and television discovery platform called WatchQuest.
 
 Slogan: LESS SCROLLING. MORE WATCHING.
 
-Stream Guide combines personalised entertainment recommendations, verified streaming availability, community reviews, achievements and nostalgic animated 3D avatars.
+Secondary slogan: FIND • WATCH • RATE • LEVEL UP.
+
+WatchQuest combines personalised entertainment recommendations, verified streaming availability, community reviews, achievements and nostalgic animated 3D avatars.
 
 The product should make choosing something to watch enjoyable rather than frustrating.
 
@@ -75,7 +77,7 @@ Select commercially permitted hosting when deployment is required.
 
 ## 5. BRANDING AND DESIGN
 
-Use the official supplied SG logo and approved design boards.
+Use the supplied official WatchQuest crowned shield and wordmark and the approved WatchQuest Design Board v2.0.
 
 Brand colours:
 
@@ -103,7 +105,7 @@ Design direction:
 
 Do not redesign the approved logo without permission.
 
-Desktop uses sidebar navigation.
+Desktop uses horizontal navigation.
 
 Mobile uses bottom navigation.
 
@@ -111,11 +113,13 @@ Main navigation:
 
 - Home
 - Discover
-- Saved
-- Community
+- Movie DNA
+- Watchlist
+- Achievements
 - Profile
+- Community
 
-Also include search, notifications, account settings and Stream Guide+ information.
+Also include search, notifications, account settings and WatchQuest+ information.
 
 ## 6. ACCOUNTS
 
@@ -148,7 +152,7 @@ Provide account deletion and data export.
 
 Create a game-inspired introductory experience.
 
-The animated Stream Guide founder mascot welcomes the user.
+The animated WatchQuest founder mascot welcomes the user.
 
 Onboarding sequence:
 
@@ -197,7 +201,7 @@ Provide reliable direct Watch Now links when supported.
 
 Use clearly labelled provider search links when direct links are unavailable.
 
-Stream Guide must not host or distribute copyrighted films or television episodes.
+WatchQuest must not host or distribute copyrighted films or television episodes.
 
 ## 9. FILM AND TELEVISION DATABASE
 
@@ -214,7 +218,7 @@ Include permitted metadata:
 - Trailers
 - Streaming availability
 - External ratings where licensed
-- Stream Guide community rating
+- WatchQuest community rating
 
 Include links to relevant streaming services.
 
@@ -261,7 +265,7 @@ Free membership:
 - Five films
 - One television series
 
-Proposed Stream Guide+ membership:
+Proposed WatchQuest+ membership:
 
 - Fifteen films
 - Three television series
@@ -441,7 +445,7 @@ Reward achievements with cosmetic avatar items.
 
 Example rewards:
 
-- Stream Guide cap
+- WatchQuest cap
 - Hoodies
 - Space helmet
 - Fantasy sword
@@ -511,11 +515,11 @@ The avatar system must remain secondary to film discovery.
 
 ## 19. FOUNDER MASCOT
 
-Create the Stream Guide founder mascot using exactly the same character system available to users.
+Create the WatchQuest founder mascot using exactly the same character system available to users.
 
 Use my supplied reference photograph to match my appearance as closely as the assets allow.
 
-Give the mascot an exclusive Stream Guide hoodie featuring the approved SG logo.
+Give the mascot an exclusive WatchQuest hoodie featuring the approved WatchQuest logo.
 
 The mascot should:
 
@@ -581,7 +585,7 @@ Clearly identify incomplete catalogue coverage and unverified pricing.
 
 Do not falsely claim savings or guaranteed availability.
 
-## 23. STREAM GUIDE REWIND
+## 23. WATCHQUEST REWIND
 
 Create an annual personalised viewing summary.
 
@@ -616,7 +620,7 @@ Proposed features:
 - Availability alerts where supported
 - Non-intrusive adverts after monetisation is enabled
 
-## 25. STREAM GUIDE+
+## 25. WATCHQUEST+
 
 Proposed pricing:
 
@@ -640,7 +644,7 @@ Proposed premium benefits:
 - Couple and Friends Mode
 - Movie DNA compatibility
 - Subscription Advisor
-- Stream Guide Rewind
+- WatchQuest Rewind
 
 Keep pricing, allowances and entitlements configurable.
 

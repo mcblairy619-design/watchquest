@@ -1,5 +1,11 @@
 # Changelog
 
+## Phase 2.2 · WatchQuest
+
+- Backed up the Phase 2.1 checkpoint to GitHub.
+- Applied the approved WatchQuest logo, app icons, typography and responsive navigation while retaining the existing cinematic banner.
+- Added available catalogue details and watched controls to weekly picks, plus a dashboard summary of existing browser activity.
+
 ## 23 November 2026 · Phase 2.1
 
 - Fixed live search resets and stale responses, and restored First Film for native Movie of the Night IDs.

@@ -6,6 +6,7 @@
 | 1 | Responsive React/TypeScript/Vite shell using approved SG branding, desktop sidebar, mobile tabs, accessible controls and clear empty states. Verify build and responsive navigation. |
 | 2 | Choose permitted providers and build server-side metadata and availability adapters. Verify attribution, regional offers, timestamp and link handling. |
 | 2.1 | Verify Movie of the Night without TMDB, document the free-plan cap and supplementary sources, and fix the audited regressions. |
+| 2.2 | Back up Phase 2.1 and apply the approved WatchQuest rebrand and dashboard design. Verify responsive layouts and existing browser data. |
 | 3 | Implement Supabase accounts, persistence, access policies and basic guest/onboarding flows. Verify account isolation and recovery. |
 | 4 | Implement Movie DNA, feedback and weekly recommendations. Verify eligibility, quotas, history, replacement and prediction tracking. |
 | 5 | Build Roll the Dice, Spin to Watch and initial discovery. Verify filters, exhausted pools, rotation, fair wheel and reduced motion. |
@@ -20,4 +21,4 @@
 | 14 | Launch approved hosting and installable PWA. Verify deployment, installation and operational readiness. |
 | 15 | Evaluate native iOS and Android releases with shared APIs and domain logic. |
 
-The Phase 2.1 checkpoint is ready for review. Phase 3 is awaiting owner approval. See [PROGRESS.md](PROGRESS.md) for verification status.
+Phase 2.1 is backed up to GitHub. Phase 2.2 is awaiting approval to push its local checkpoint. Phase 3 is awaiting owner approval. See [PROGRESS.md](PROGRESS.md) for verification status.

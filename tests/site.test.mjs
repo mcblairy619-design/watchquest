@@ -26,6 +26,14 @@ for (const [name, path] of browsers) {
             errors.push(response.status() + " " + response.url());
         });
         await page.goto(url);
+        const mark = page.locator(".site-header .brand-wordmark");
+        await mark.waitFor();
+        assert.ok(
+          await mark.evaluate(
+            (image) => image.complete && image.naturalWidth > 0,
+          ),
+        );
+        assert.equal(await page.title(), "WatchQuest");
         assert.equal(await page.locator(".weekly .card").count(), 6);
         const desktopNav = page.getByRole("navigation", {
           name: "Main navigation",
@@ -72,7 +80,7 @@ for (const [name, path] of browsers) {
         );
         await page.keyboard.press("Escape");
 
-        await page.getByRole("button", { name: "Get started" }).click();
+        await desktopNav.getByRole("button", { name: "Movie DNA" }).click();
         await dialog.getByRole("button", { name: "Continue as guest" }).click();
         await dialog.getByLabel("Display name (optional)").fill("Demo Viewer");
         await dialog.getByLabel("Viewing country").selectOption("Ireland");
@@ -118,7 +126,7 @@ for (const [name, path] of browsers) {
         await mobile.getByRole("heading", { name: "Achievements" }).waitFor();
         await mobileNav.getByRole("link", { name: "Profile" }).click();
         await mobile.getByRole("link", { name: "Premium" }).click();
-        await mobile.getByRole("heading", { name: "Stream Guide+" }).waitFor();
+        await mobile.getByRole("heading", { name: "WatchQuest+" }).waitFor();
         await mobileNav.getByRole("link", { name: "Home" }).click();
         await mobile.getByRole("button", { name: "Spin to Watch" }).click();
         await mobile.getByRole("button", { name: "Spin the wheel" }).click();
@@ -127,6 +135,32 @@ for (const [name, path] of browsers) {
         await mobile.setViewportSize({ width: 320, height: 700 });
         assert.ok(
           await mobile.evaluate(
+            () =>
+              globalThis.document.documentElement.scrollWidth ===
+              globalThis.innerWidth,
+          ),
+        );
+        await page.setViewportSize({ width: 810, height: 1080 });
+        await page.goto(url);
+        await page
+          .getByRole("heading", { name: "This Week’s Picks For You" })
+          .waitFor();
+        assert.ok(
+          await page.evaluate(
+            () =>
+              globalThis.document.documentElement.scrollWidth ===
+              globalThis.innerWidth,
+          ),
+        );
+        const android = await browser.newPage(devices["Pixel 7"]);
+        await android.goto(url);
+        assert.ok(
+          await android
+            .getByRole("navigation", { name: "Mobile navigation" })
+            .isVisible(),
+        );
+        assert.ok(
+          await android.evaluate(
             () =>
               globalThis.document.documentElement.scrollWidth ===
               globalThis.innerWidth,
