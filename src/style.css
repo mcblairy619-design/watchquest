@@ -921,6 +921,158 @@ dialog > button {
     padding-inline: 12px;
   }
 }
+.dna-wizard {
+  display: grid;
+  gap: 13px;
+}
+.dna-step {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.dna-step progress {
+  width: 100%;
+  height: 0.55rem;
+  accent-color: var(--accent);
+}
+.dna-wizard .welcome {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+}
+.dna-wizard .welcome img {
+  width: 58px;
+  height: 58px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+.dna-options {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 10px;
+}
+.dna-options legend {
+  padding-inline: 5px;
+  font-weight: 700;
+}
+.dna-options .chips {
+  margin: 7px 0 0;
+}
+.dna-options .chip:disabled {
+  cursor: default;
+}
+.dna-summary {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 215px), 1fr));
+  margin: 16px 0;
+}
+.dna-summary > div {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  padding: 13px;
+}
+.dna-summary dt {
+  font-weight: 700;
+}
+.dna-summary dd {
+  margin: 6px 0 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.dna-summary .text-button {
+  display: block;
+  margin-top: 4px;
+}
+.dna-list {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+}
+.dna-list li,
+.title-feedback,
+.dna-search {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+.dna-list li {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+.dna-list .button {
+  margin-top: 0;
+}
+.dna-search label {
+  flex: 1 1 12rem;
+}
+.dna-search input,
+.rating-input select {
+  display: block;
+  width: 100%;
+  min-height: 42px;
+  margin-top: 5px;
+  padding: 6px 8px;
+  border: 1px solid #4d6380;
+  border-radius: 8px;
+  background: #0b1320;
+  color: inherit;
+}
+.dna-actions {
+  margin-top: 4px;
+}
+.dna-actions .primary {
+  margin-left: auto;
+}
+.title-feedback {
+  margin-top: 16px;
+}
+.weekly-note,
+.weekly-inactive {
+  margin-top: 12px;
+}
+.weekly-inactive summary,
+.weekly-history summary {
+  color: #93ccff;
+  cursor: pointer;
+}
+.weekly-history details {
+  padding-block: 8px;
+}
+.pick-explanation {
+  margin-top: 8px;
+}
+.pick-explanation strong {
+  font-size: 0.82rem;
+  color: #b9e0ff;
+}
+.pick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+.text-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #9aceff;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -150,6 +150,8 @@ Provide account deletion and data export.
 
 ## 7. INTERACTIVE ONBOARDING
 
+Phase 3 implements the browser-local Movie DNA questionnaire as a nine-step flow of approximately 3–5 minutes. The broader account and avatar journey remains planned. See [Movie DNA behaviour and storage](MOVIE_DNA.md).
+
 Create a game-inspired introductory experience.
 
 The animated WatchQuest founder mascot welcomes the user.
@@ -230,6 +232,8 @@ Complete a commercial data licensing review before monetisation or public commer
 
 ## 10. MOVIE DNA
 
+The current deterministic implementation ranks from known genres, runtime, preferences and explicit feedback. Story, pacing and content choices are saved until reliable metadata can support them.
+
 Create an evolving personal entertainment taste profile.
 
 Learn from:
@@ -257,6 +261,8 @@ Use feedback to improve future recommendations.
 Do not falsely describe a basic algorithm as a live AI language model.
 
 ## 11. WEEKLY WATCHLIST
+
+Phase 3 ships the free five-film and one-series targets, a Monday rollover in Europe/London, and replacement of individual picks. Available results can fall below the targets when catalogue coverage is limited.
 
 Generate personalised weekly recommendations.
 

@@ -7,10 +7,11 @@ const regions = new Set(["gb", "ie", "us", "ca", "au"]);
 const offerTypes = new Set(["subscription", "rent", "buy", "addon", "free"]);
 
 class ProviderError extends Error {
-  constructor(status, retryAfter) {
+  constructor(status, retryAfter, code) {
     super("Catalogue provider request failed");
     this.status = status;
     this.retryAfter = retryAfter;
+    this.code = code;
   }
 }
 
@@ -46,7 +47,7 @@ function createClient(base, headers, fetcher, limits, reserve = () => 0) {
     }
     if (budgetWait) throw new ProviderError(429, Math.ceil(budgetWait / 1000));
     const quotaWait = reserve();
-    if (quotaWait) throw new ProviderError(429, quotaWait);
+    if (quotaWait) throw new ProviderError(429, quotaWait, "local_quota");
     for (const window of windows) window.calls.push(now);
     if (cache.size >= 256) {
       const evictable = [...cache].find(([, entry]) => !entry.active);
@@ -254,9 +255,52 @@ export function createCatalogue(env, fetcher = globalThis.fetch, budgetPath) {
         ttl,
       );
 
-    if (url.pathname === "/api/catalogue") {
+    if (url.pathname === "/api/catalogue/services") {
+      if (!available) throw new ProviderError(503);
+      if (!validCountry) return { services: [] };
+      const { data } = await streaming("/countries/" + country, ttl);
+      if (
+        data.countryCode?.toLowerCase() !== country ||
+        !Array.isArray(data.services)
+      ) {
+        throw new ProviderError(502);
+      }
+      return {
+        services: data.services
+          .filter(
+            (service) =>
+              service?.streamingOptionTypes?.subscription === true &&
+              /^[a-z0-9_-]{1,32}$/.test(service.id ?? "") &&
+              typeof service.name === "string",
+          )
+          .map(({ id, name }) => ({ id, name })),
+      };
+    }
+
+    if (url.pathname === "/api/catalogue/favourites") {
+      if (!available) throw new ProviderError(503);
       const query = (url.searchParams.get("q") ?? "").trim().toLowerCase();
       if (query.length > 100) throw new ProviderError(400);
+      if (query.length < 2 || !validCountry) return { titles: [] };
+      const { data } = await streaming(
+        "/shows/search/title?" + params({ country, title: query }),
+        ttl,
+      );
+      if (!Array.isArray(data)) throw new ProviderError(502);
+      const titles = data.map(fromStreaming).filter(Boolean);
+      return {
+        titles: [
+          ...new Map(titles.map((title) => [title.id, title])).values(),
+        ].slice(0, 12),
+      };
+    }
+
+    if (url.pathname === "/api/catalogue") {
+      const query = (url.searchParams.get("q") ?? "").trim().toLowerCase();
+      const kind = url.searchParams.get("kind");
+      if (query.length > 100) throw new ProviderError(400);
+      if (kind && !["movie", "series"].includes(kind))
+        throw new ProviderError(400);
       if (!available) throw new ProviderError(503);
       const services = [
         ...new Set(
@@ -279,6 +323,7 @@ export function createCatalogue(env, fetcher = globalThis.fetch, budgetPath) {
               .map((service) => service + ".subscription")
               .join(","),
             order_by: "popularity_1week",
+            ...(kind ? { show_type: kind } : {}),
           });
       const { data, checkedAt } = await streaming(route, ttl);
       const shows = query ? data : data.shows;
@@ -289,6 +334,7 @@ export function createCatalogue(env, fetcher = globalThis.fetch, budgetPath) {
         const offers = regionalOffers(show, country);
         if (
           title &&
+          (!kind || title.type === (kind === "movie" ? "Film" : "Series")) &&
           offers?.some(
             (offer) =>
               offer.type === "subscription" &&
@@ -376,6 +422,7 @@ export function catalogueMiddleware(env) {
         res.setHeader("Retry-After", String(error.retryAfter));
       res.end(
         JSON.stringify({
+          code: error.code === "local_quota" ? error.code : undefined,
           error:
             res.statusCode === 429
               ? "The data provider is busy. Try again later."

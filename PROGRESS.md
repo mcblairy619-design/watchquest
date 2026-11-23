@@ -1,5 +1,13 @@
 # Progress and asset audit
 
+## Phase 3 · Movie DNA 2.0
+
+- The latest owner brief moved browser-local personalisation into Phase 3. Supabase accounts and cross-device data are deferred.
+- Added the questionnaire, profile, deterministic ranking, personal predictions with a three-rating minimum, feedback and London calendar-week records with individual replacements.
+- Reused the verified live catalogue and its budget. Country service metadata, explicitly submitted favourite searches and targeted weekly supplements all share the same 450-request rolling 31-day ceiling. See [Movie DNA implementation and scoring](MOVIE_DNA.md).
+- Lint, TypeScript, production build and all 19 automated tests passed. Chrome and Edge covered desktop and mobile emulation. A Chrome browser test verified slot replacement, reload persistence and Monday rollover. Visually checked the desktop dashboard and iPhone-sized questionnaire. Tests used mocks and the demo catalogue without live provider calls.
+- Remaining limits include physical Safari testing, live coverage beyond prior audited samples, per-season availability, third-party artwork clearance and an absence of verified storytelling, pacing and content metadata.
+
 ## Phase 2.2 · WatchQuest
 
 - Verified GitHub `watchquest/main` at the approved Phase 2.1 checkpoint `5d2e294` before the rebrand.

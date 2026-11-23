@@ -5,7 +5,7 @@ export const titles = [
     genre: "Sci-fi",
     type: "Film",
     time: "112 min",
-    score: 96,
+    demo: true,
     art: "orbit",
     synopsis:
       "A lone pilot follows a distress signal to a station that should have gone dark decades ago.",
@@ -16,7 +16,7 @@ export const titles = [
     genre: "Thriller",
     type: "Film",
     time: "101 min",
-    score: 94,
+    demo: true,
     art: "neon",
     synopsis:
       "A night-shift courier witnesses a disappearance in a city that records everything.",
@@ -27,7 +27,7 @@ export const titles = [
     genre: "Mystery",
     type: "Film",
     time: "106 min",
-    score: 92,
+    demo: true,
     art: "north",
     synopsis:
       "An isolated weather station receives a transmission from a team that never arrived.",
@@ -38,7 +38,7 @@ export const titles = [
     genre: "Mystery",
     type: "Film",
     time: "98 min",
-    score: 89,
+    demo: true,
     art: "pines",
     synopsis:
       "Estranged siblings return to a woodland estate where the rooms seem to change overnight.",
@@ -49,7 +49,7 @@ export const titles = [
     genre: "Drama",
     type: "Film",
     time: "109 min",
-    score: 87,
+    demo: true,
     art: "tide",
     synopsis:
       "A coastal town reconnects after the sea returns an object lost a generation ago.",
@@ -60,10 +60,9 @@ export const titles = [
     genre: "Sci-fi",
     type: "Series",
     time: "6 episodes",
-    score: 86,
+    demo: true,
     art: "signal",
     synopsis:
       "An amateur radio club discovers a broadcast from the following day.",
   },
 ] as const;
-export const genres = [...new Set(titles.map((title) => title.genre))];

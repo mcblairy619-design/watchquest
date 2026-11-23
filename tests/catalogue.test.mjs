@@ -38,6 +38,93 @@ const show = (id, streamingOptions) => ({
   imageSet: { verticalPoster: { w360: "https://example.com/poster.jpg" } },
 });
 
+test("questionnaire services require a country and a genuine base subscription", async (t) => {
+  let calls = 0;
+  const run = createCatalogue(
+    env,
+    async (path) => {
+      calls++;
+      assert.ok(path.endsWith("/countries/ie"));
+      return json({
+        countryCode: "ie",
+        services: [
+          {
+            id: "netflix",
+            name: "Netflix",
+            streamingOptionTypes: { subscription: true },
+          },
+          {
+            id: "rentals",
+            name: "Rentals",
+            streamingOptionTypes: { rent: true },
+          },
+          {
+            id: "addons",
+            name: "Add-ons",
+            streamingOptionTypes: { addon: true },
+          },
+        ],
+      });
+    },
+    budget(t),
+  );
+  assert.deepEqual(await run(route("/services?country=zz")), { services: [] });
+  assert.deepEqual(await run(route("/services?country=ie")), {
+    services: [{ id: "netflix", name: "Netflix" }],
+  });
+  assert.equal(calls, 1);
+});
+
+test("favourite lookup can return metadata outside subscriptions but never supplies recommendation offers", async (t) => {
+  const run = createCatalogue(
+    env,
+    async (path) => {
+      const url = new URL(path);
+      assert.equal(url.searchParams.get("country"), "gb");
+      if (url.searchParams.get("title") === "empty") return json([]);
+      return json([show(3, { gb: [offer("rent")] }), show(3, {})]);
+    },
+    budget(t),
+  );
+  assert.deepEqual(await run(route("/favourites?country=gb&q=empty")), {
+    titles: [],
+  });
+  const result = await run(route("/favourites?country=gb&q=title"));
+  assert.equal(result.titles.length, 1);
+  assert.equal(result.titles[0].id, "tmdb-movie-3");
+  assert.equal(result.titles[0].availability, undefined);
+});
+
+test("a targeted weekly supplement still requires right type and subscription", async (t) => {
+  const run = createCatalogue(
+    env,
+    async (path) => {
+      assert.equal(new URL(path).searchParams.get("show_type"), "series");
+      return json({
+        shows: [
+          show(1, { gb: [offer("subscription")] }),
+          {
+            ...show(2, { gb: [offer("buy")] }),
+            showType: "series",
+            tmdbId: "tv/2",
+          },
+          {
+            ...show(3, { gb: [offer("subscription")] }),
+            showType: "series",
+            tmdbId: "tv/3",
+          },
+        ],
+      });
+    },
+    budget(t),
+  );
+  const result = await run(route("?country=gb&services=netflix&kind=series"));
+  assert.deepEqual(
+    result.titles.map(({ id }) => id),
+    ["tmdb-tv-3"],
+  );
+});
+
 test("disabled accounts make no upstream calls", async (t) => {
   const run = createCatalogue(
     { ...env, AVAILABILITY_FREE_PLAN: "" },
@@ -167,6 +254,7 @@ test("quota survives restarts and honours Retry-After", async (t) => {
   await assert.rejects(run(url), { status: 429 });
   await assert.rejects(createCatalogue(limited, upstream, path)(url), {
     status: 429,
+    code: "local_quota",
   });
   assert.equal(calls, 1);
 });

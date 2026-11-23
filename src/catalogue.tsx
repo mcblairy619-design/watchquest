@@ -10,7 +10,7 @@ export type Title = {
   time?: string;
   synopsis?: string;
   releaseDate?: string;
-  score?: number;
+  demo?: boolean;
   art?: string;
   poster?: string;
   source?: "movie-of-the-night";
@@ -52,12 +52,23 @@ export function useCatalogueRequest<T>(path: string | undefined, delay = 0) {
     const timer = window.setTimeout(async () => {
       try {
         const response = await fetch(path, { signal: controller.signal });
-        if (!response.ok)
+        if (!response.ok) {
+          if (response.status === 429) {
+            const body = (await response.json().catch(() => null)) as {
+              code?: string;
+            } | null;
+            if (body?.code === "local_quota") {
+              throw new Error(
+                "The local catalogue request allowance is exhausted.",
+              );
+            }
+          }
           throw new Error(
             response.status === 429
               ? "The data provider is busy. Try again later."
               : "Could not load catalogue information.",
           );
+        }
         const data: T = await response.json();
         if (!controller.signal.aborted) setResult({ request, data });
       } catch (error) {
@@ -173,12 +184,11 @@ export function Availability({
     ? title.availability
     : undefined;
   const request = useCatalogueRequest<AvailabilityData>(
-    title.score === undefined && region && !embedded
+    !title.demo && region && !embedded
       ? "/api/catalogue/" + title.id + "/availability?country=" + region
       : undefined,
   );
-  if (title.score !== undefined)
-    return <p>Streaming availability unverified.</p>;
+  if (title.demo) return <p>Streaming availability unverified.</p>;
   if (!region)
     return <p>Availability checks are unavailable for the selected country.</p>;
   if (request.loading)

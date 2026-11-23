@@ -26,17 +26,41 @@ import "@fontsource/inter/latin-600.css";
 import "@fontsource/inter/latin-700.css";
 import "@fontsource/montserrat/latin-700.css";
 import "@fontsource/montserrat/latin-800.css";
-import { genres as demoGenres, titles as demoTitles } from "./demo";
+import { titles as demoTitles } from "./demo";
 import {
   Availability,
   countries,
   includedWith,
   includedServices,
   Poster,
-  subscriptionServices,
   useCatalogueRequest,
 } from "./catalogue";
 import type { Title } from "./catalogue";
+import {
+  MovieDnaPage,
+  MovieDnaQuestionnaire,
+  RatingInput,
+} from "./movie-dna-ui";
+import {
+  assessTitle,
+  changeRating,
+  createWeekly,
+  defaultProfile,
+  emptyFeedback,
+  fillWeekly,
+  normaliseProfile,
+  replaceWeekly,
+  toggleRejection,
+  weekStarting,
+} from "./movie-dna";
+import type {
+  Feedback,
+  Profile,
+  RankingContext,
+  TitleSummary,
+  WeeklyPick,
+  WeeklyRecord,
+} from "./movie-dna";
 import "./style.css";
 
 const pages = [
@@ -47,21 +71,17 @@ const pages = [
   { id: "profile", name: "Profile", icon: UserRound },
   { id: "community", name: "Community", icon: Users },
   { id: "premium", name: "Premium", icon: Crown },
+  { id: "movie-dna", name: "Movie DNA", icon: Dna },
 ] as const;
 type Page = (typeof pages)[number];
-type Profile = {
-  name: string;
-  country: string;
-  genres: string[];
-  subscriptions?: Record<string, string[]>;
-};
 type Overlay =
-  "dice" | "spin" | "onboard" | "notifications" | "credits" | Title;
-const defaultProfile: Profile = {
-  name: "",
-  country: "United Kingdom",
-  genres: [],
-};
+  | "dice"
+  | "spin"
+  | "onboard"
+  | "edit-dna"
+  | "notifications"
+  | "credits"
+  | Title;
 
 function Brand({ mobile = false }: { mobile?: boolean }) {
   return (
@@ -135,164 +155,6 @@ function Modal({
   );
 }
 
-function Onboarding({
-  profile,
-  live,
-  save,
-  close,
-}: {
-  profile: Profile;
-  live: boolean;
-  save: (value: Profile) => void;
-  close: () => void;
-}) {
-  const [step, setStep] = useState(0);
-  const [draft, setDraft] = useState(profile);
-  const region = countries[draft.country];
-  const selected = draft.subscriptions?.[region] ?? [];
-  return (
-    <Modal title="Set up your Movie DNA" close={close}>
-      <p className="eyebrow">STEP {step + 1} OF 3</p>
-      {step === 0 && (
-        <div className="welcome">
-          <div className="mascot">
-            <img
-              src="/media/mascot.jpg"
-              alt="Founder mascot concept in a dark hoodie"
-            />
-            <img
-              className="mascot-logo"
-              src="/media/watchquest-shield.png"
-              alt=""
-            />
-          </div>
-          <div>
-            <h3>Welcome to WatchQuest</h3>
-            <p>
-              Pick a viewing country and the genres you enjoy. You can try the
-              site as a guest.
-            </p>
-          </div>
-        </div>
-      )}
-      {step === 1 && (
-        <div className="form-stack">
-          <label>
-            Display name (optional)
-            <input
-              maxLength={30}
-              value={draft.name}
-              onChange={(event) =>
-                setDraft({ ...draft, name: event.target.value })
-              }
-            />
-          </label>
-          <label>
-            Viewing country
-            <select
-              value={draft.country}
-              onChange={(event) =>
-                setDraft({ ...draft, country: event.target.value })
-              }
-            >
-              {[
-                "United Kingdom",
-                "Ireland",
-                "United States",
-                "Canada",
-                "Australia",
-                "Other",
-              ].map((country) => (
-                <option key={country}>{country}</option>
-              ))}
-            </select>
-          </label>
-          {live && region ? (
-            <fieldset>
-              <legend>Your subscriptions in {draft.country}</legend>
-              <p>
-                Select services you already pay for. Paid add-on channels are
-                excluded.
-              </p>
-              <div className="chips">
-                {subscriptionServices.map(([id, name]) => (
-                  <button
-                    key={id}
-                    className="chip"
-                    type="button"
-                    aria-pressed={selected.includes(id)}
-                    onClick={() =>
-                      setDraft({
-                        ...draft,
-                        subscriptions: {
-                          ...draft.subscriptions,
-                          [region]: selected.includes(id)
-                            ? selected.filter((item) => item !== id)
-                            : [...selected, id],
-                        },
-                      })
-                    }
-                  >
-                    {name}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-          ) : (
-            <p>Country is saved for availability checks.</p>
-          )}
-        </div>
-      )}
-      {step === 2 && (
-        <>
-          <h3>What do you like watching?</h3>
-          <div className="chips">
-            {demoGenres.map((genre) => (
-              <button
-                key={genre}
-                className="chip"
-                aria-pressed={draft.genres.includes(genre)}
-                onClick={() =>
-                  setDraft({
-                    ...draft,
-                    genres: draft.genres.includes(genre)
-                      ? draft.genres.filter((value) => value !== genre)
-                      : [...draft.genres, genre],
-                  })
-                }
-              >
-                {genre}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-      <div className="actions">
-        <button
-          className="button secondary"
-          onClick={() => (step ? setStep(step - 1) : close())}
-        >
-          {step ? "Back" : "Skip for now"}
-        </button>
-        <button
-          className="button primary"
-          onClick={() =>
-            step < 2
-              ? setStep(step + 1)
-              : save({ ...draft, name: draft.name.trim() })
-          }
-        >
-          {step === 0
-            ? "Continue as guest"
-            : step === 1
-              ? "Continue"
-              : "Save preferences"}
-        </button>
-      </div>
-    </Modal>
-  );
-}
-
 function RequestMessage({
   loading,
   error,
@@ -348,9 +210,7 @@ function SavedEntry({
 
 function TitleDetails({ title, country }: { title: Title; country: string }) {
   const detail = useCatalogueRequest<{ title: Title }>(
-    title.score === undefined && !title.source
-      ? "/api/catalogue/" + title.id
-      : undefined,
+    !title.demo && !title.source ? "/api/catalogue/" + title.id : undefined,
   );
   const item = detail.data?.title ?? title;
   return (
@@ -358,9 +218,7 @@ function TitleDetails({ title, country }: { title: Title; country: string }) {
       <div className="result">
         <Poster title={item} />
         <div>
-          {item.score !== undefined && (
-            <p className="eyebrow">FICTIONAL DEMO TITLE</p>
-          )}
+          {item.demo && <p className="eyebrow">FICTIONAL DEMO TITLE</p>}
           <p>
             {[
               item.genres?.length ? item.genres.join(", ") : item.genre,
@@ -389,12 +247,19 @@ function TitleDetails({ title, country }: { title: Title; country: string }) {
 
 function App() {
   const [page, setPage] = useState(activePage);
+  const [weeklyRequested, setWeeklyRequested] = useState(page === "home");
   const [saved, setSaved] = useLocal<string[]>("saved", []);
   const [watched, setWatched] = useLocal<string[]>("watched", []);
   const [watchedTypes, setWatchedTypes] = useLocal<
     Record<string, Title["type"]>
   >("watched-types", {});
-  const [profile, setProfile] = useLocal("profile", defaultProfile);
+  const [profile, setProfile] = useLocal<Profile>("profile", defaultProfile);
+  const [feedback, setFeedback] = useLocal<Feedback>(
+    "movie-feedback",
+    emptyFeedback,
+  );
+  const [weeks, setWeeks] = useLocal<WeeklyRecord[]>("weekly-picks", []);
+  const [replacementMessage, setReplacementMessage] = useState("");
   const [query, setQuery] = useState("");
   const [submitted, setSubmitted] = useState("");
   const [clock, setClock] = useState(Date.now);
@@ -412,10 +277,9 @@ function App() {
   );
   const live = status.data?.enabled === true;
   useEffect(() => {
-    if (!live) return;
     const timer = window.setInterval(() => setClock(Date.now()), 30000);
     return () => window.clearInterval(timer);
-  }, [live]);
+  }, []);
   const region = countries[profile.country] ?? "";
   const services = profile.subscriptions?.[region] ?? [];
   const cataloguePath =
@@ -436,21 +300,115 @@ function App() {
   );
   const eligibleNow = (title: Title, now: number) =>
     !live || includedWith(title, region, services, now);
-  const titles: readonly Title[] = live
+  const primaryTitles: readonly Title[] = live
     ? (catalogue.data?.titles ?? []).filter((title) =>
         eligibleNow(title, clock),
       )
     : demoTitles;
-  const weekly = [
-    ...titles.filter((title) => title.type === "Film").slice(0, 5),
-    ...titles.filter((title) => title.type === "Series").slice(0, 1),
+  const countUnseen = (type: Title["type"]) =>
+    primaryTitles.filter(
+      (title) =>
+        title.type === type &&
+        !watched.includes(title.id) &&
+        !Object.hasOwn(feedback.rejected, title.id),
+    ).length;
+  const canSupplement = live && weeklyRequested && primaryTitles.length > 0;
+  const filmSupplement = useCatalogueRequest<{ titles: Title[] }>(
+    canSupplement && countUnseen("Film") < 5
+      ? cataloguePath + "&kind=movie"
+      : undefined,
+  );
+  const seriesSupplement = useCatalogueRequest<{ titles: Title[] }>(
+    canSupplement && countUnseen("Series") < 1
+      ? cataloguePath + "&kind=series"
+      : undefined,
+  );
+  const titles = [
+    ...new Map(
+      [
+        ...primaryTitles,
+        ...(filmSupplement.data?.titles ?? []),
+        ...(seriesSupplement.data?.titles ?? []),
+      ]
+        .filter((title) => eligibleNow(title, clock))
+        .map((title) => [title.id, title]),
+    ).values(),
   ];
+  const week = weekStarting(clock);
+  const scope = live
+    ? region + "|" + [...new Set(services)].sort().join(",")
+    : "demo";
+  const ranking: RankingContext = {
+    taste: normaliseProfile(profile),
+    feedback,
+    saved,
+    watched,
+    history: weeks,
+    week,
+    scope,
+    basedOnDna: !!profile.dna || profile.genres.length > 0,
+  };
+  const existingWeek = weeks.find(
+    (entry) => entry.week === week && entry.scope === scope,
+  );
+  const weeklyRecord = fillWeekly(
+    existingWeek ?? createWeekly(ranking),
+    titles,
+    ranking,
+  );
+  const canSaveWeek = live
+    ? !!catalogue.data && !filmSupplement.loading && !seriesSupplement.loading
+    : status.data?.enabled === false || !!status.error;
+  useEffect(() => {
+    if (
+      !canSaveWeek ||
+      !weeklyRecord.picks.length ||
+      weeklyRecord === existingWeek
+    )
+      return;
+    setWeeks((previous) => {
+      const old = previous.find(
+        (entry) =>
+          entry.week === weeklyRecord.week &&
+          entry.scope === weeklyRecord.scope,
+      );
+      if (old !== existingWeek) return previous;
+      return old
+        ? previous.map((entry) => (entry === old ? weeklyRecord : entry))
+        : [...previous, weeklyRecord];
+    });
+  }, [canSaveWeek, existingWeek, weeklyRecord, setWeeks]);
+  const activeTitles = new Map(
+    titles
+      .filter(
+        (title) =>
+          !watched.includes(title.id) &&
+          !Object.hasOwn(feedback.rejected, title.id),
+      )
+      .map((title) => [title.id, title]),
+  );
+  const orderedPicks = [...weeklyRecord.picks].sort(
+    (a, b) => Number(a.type === "Series") - Number(b.type === "Series"),
+  );
+  const weekly = orderedPicks.flatMap((pick) => {
+    const title = activeTitles.get(pick.id);
+    return title ? [title] : [];
+  });
+  const predictions = new Map(
+    weekly.map((title) => [
+      title.id,
+      assessTitle(title, ranking.taste, feedback, saved).prediction,
+    ]),
+  );
+  const inactive = weeklyRecord.picks.filter(
+    (pick) => !activeTitles.has(pick.id),
+  );
   const browseRequest = searchPath ? searchResults : catalogue;
   const browse = searchPath
     ? (searchResults.data?.titles ?? []).filter((title) =>
         eligibleNow(title, clock),
       )
-    : titles;
+    : primaryTitles;
   const genres = [
     ...new Set(browse.flatMap((title) => title.genres ?? [title.genre])),
   ];
@@ -508,6 +466,7 @@ function App() {
   useEffect(() => {
     const navigate = () => {
       const nextPage = activePage();
+      if (nextPage === "home") setWeeklyRequested(true);
       if (nextPage !== "discover") clearSearch();
       setPage(nextPage);
       window.scrollTo(0, 0);
@@ -540,6 +499,36 @@ function App() {
         : [...previous, id],
     );
   };
+  const rate = (title: TitleSummary, value?: number) =>
+    setFeedback((previous) => changeRating(previous, title, value));
+  const reject = (title: TitleSummary) =>
+    setFeedback((previous) => toggleRejection(previous, title));
+  const replace = (id: string) => {
+    const candidates = titles.filter((title) => eligibleNow(title, Date.now()));
+    const next = replaceWeekly(weeklyRecord, id, candidates, ranking);
+    if (next === weeklyRecord) {
+      setReplacementMessage(
+        "No eligible replacement of the same type is available.",
+      );
+      return;
+    }
+    setWeeks((previous) => {
+      const current = previous.find(
+        (entry) => entry.week === week && entry.scope === scope,
+      );
+      const updated =
+        !current || current === weeklyRecord
+          ? next
+          : replaceWeekly(current, id, candidates, ranking);
+      if (updated === current) return previous;
+      return current
+        ? previous.map((entry) => (entry === current ? updated : entry))
+        : [...previous, updated];
+    });
+    setReplacementMessage(
+      "Replaced one pick. The rest of the week is unchanged.",
+    );
+  };
   const close = () => {
     window.clearTimeout(spinTimer.current);
     setSpinning(false);
@@ -553,7 +542,7 @@ function App() {
   const spinPool = weekly.filter(
     (title) => title.type === "Film" && !watched.includes(title.id),
   );
-  const dicePool = titles.filter((title) => !watched.includes(title.id));
+  const dicePool = titles.filter((title) => activeTitles.has(title.id));
   function rollDice() {
     const current = dicePool.filter((title) => eligibleNow(title, Date.now()));
     const unrolled = current.filter((title) => !diceHistory.includes(title.id));
@@ -617,7 +606,7 @@ function App() {
       const title = activityTitles.get(id);
       return title ? [title] : [];
     });
-  const card = (title: Title, showWatched = false) => (
+  const card = (title: Title, pick?: WeeklyPick) => (
     <article className="card" key={title.id}>
       <button
         className="poster"
@@ -625,9 +614,7 @@ function App() {
         onClick={() => open(title)}
       >
         <Poster title={title} />
-        {title.score !== undefined && (
-          <span className="match">{title.score}% demo match</span>
-        )}
+        {title.demo && <span className="match">Demo title</span>}
         <span className="poster-title">{title.name}</span>
       </button>
       <div className="card-footer">
@@ -640,12 +627,31 @@ function App() {
           </p>
           <p>{title.genres?.join(", ") || title.genre}</p>
           {live &&
-            showWatched &&
+            pick &&
             includedServices(title, region, services, clock).map((service) => (
               <p key={service} className="card-offer">
                 Included with {service}
               </p>
             ))}
+          {pick && (
+            <div className="pick-explanation">
+              {predictions.get(title.id) !== undefined && (
+                <strong>
+                  {predictions.get(title.id)?.toFixed(1)}/10 predicted for you
+                </strong>
+              )}
+              <p>
+                {pick.reasons.length
+                  ? pick.reasons.join(" ")
+                  : live
+                    ? "Selected from verified titles on your streaming services."
+                    : "Selected from the fictional demo catalogue."}
+              </p>
+              {pick.matches.length > 0 && (
+                <p>Matching genres: {pick.matches.join(", ")}</p>
+              )}
+            </div>
+          )}
         </div>
         <div className="card-controls">
           <button
@@ -660,7 +666,7 @@ function App() {
           >
             <Bookmark size={17} />
           </button>
-          {showWatched && (
+          {pick && (
             <button
               className="icon-button"
               aria-pressed={watched.includes(title.id)}
@@ -669,19 +675,38 @@ function App() {
                   ? "Mark unwatched: "
                   : "Mark watched: ") + title.name
               }
-              onClick={() => toggleWatched(title)}
+              onClick={() => {
+                toggleWatched(title);
+                open(title);
+              }}
             >
               <Check size={17} />
             </button>
           )}
         </div>
+        {pick && (
+          <div className="pick-actions">
+            <button
+              className="text-button"
+              onClick={() => replace(title.id)}
+              aria-label={"Replace " + title.name}
+            >
+              Replace
+            </button>
+            <button
+              className="text-button"
+              onClick={() => open(title)}
+              aria-label={"Rate or give feedback for " + title.name}
+            >
+              Rate / feedback
+            </button>
+          </div>
+        )}
       </div>
     </article>
   );
-  const cards = (items: readonly Title[], showWatched = false) => (
-    <div className="cards">
-      {items.map((title) => card(title, showWatched))}
-    </div>
+  const cards = (items: readonly Title[]) => (
+    <div className="cards">{items.map((title) => card(title))}</div>
   );
 
   return (
@@ -700,10 +725,8 @@ function App() {
         <Brand />
         <nav aria-label="Main navigation">
           {pages.slice(0, 2).map((item) => nav(item))}
-          <button onClick={() => open("onboard")}>
-            <Dna size={19} /> Movie DNA
-          </button>
-          {pages.slice(2).map((item) => nav(item))}
+          {nav(pages[7])}
+          {pages.slice(2, -1).map((item) => nav(item))}
         </nav>
       </header>
       <div className="shell">
@@ -789,12 +812,9 @@ function App() {
                     >
                       <Dices size={19} /> Roll the Dice
                     </button>
-                    <button
-                      className="button secondary"
-                      onClick={() => open("onboard")}
-                    >
+                    <a className="button secondary" href="#movie-dna">
                       <Dna size={19} /> Movie DNA
-                    </button>
+                    </a>
                   </div>
                 </div>
               </section>
@@ -804,7 +824,7 @@ function App() {
                     <h2>This Week’s Picks For You</h2>
                     <p>
                       {live
-                        ? "Popular titles included with your selected subscriptions."
+                        ? "Ranked using Movie DNA and titles included with your subscriptions."
                         : "Five films and one series from the fictional demo catalogue."}
                     </p>
                   </div>
@@ -813,6 +833,17 @@ function App() {
                   </a>
                 </div>
                 <RequestMessage {...catalogue} />
+                {(filmSupplement.loading || seriesSupplement.loading) && (
+                  <p role="status">
+                    Checking more eligible titles for this week's picks…
+                  </p>
+                )}
+                {(filmSupplement.error || seriesSupplement.error) && (
+                  <p role="status">
+                    Some additional titles could not be checked.{" "}
+                    {filmSupplement.error ?? seriesSupplement.error}
+                  </p>
+                )}
                 {live && (!region || !services.length) && (
                   <button
                     className="button secondary"
@@ -821,15 +852,80 @@ function App() {
                     Set viewing country and subscriptions
                   </button>
                 )}
-                {weekly.length
-                  ? cards(weekly, true)
-                  : live &&
+                {weekly.length > 0 && (
+                  <div className="cards">
+                    {orderedPicks.map((pick) => {
+                      const title = activeTitles.get(pick.id);
+                      return title ? card(title, pick) : null;
+                    })}
+                  </div>
+                )}
+                {live &&
+                  weekly.some(
+                    (title) => predictions.get(title.id) === undefined,
+                  ) && (
+                    <p className="weekly-note">
+                      Rate a few titles with similar genres to unlock personal
+                      predictions for future picks.
+                    </p>
+                  )}
+                {(!live ||
+                  (region &&
+                    services.length > 0 &&
                     !catalogue.loading &&
-                    !catalogue.error &&
-                    region &&
-                    services.length > 0 && (
-                      <p>No catalogue picks are available.</p>
-                    )}
+                    !catalogue.error)) && (
+                  <p className="weekly-note">
+                    Week of {week} ·{" "}
+                    {weekly.filter((title) => title.type === "Film").length} of
+                    5 films ·{" "}
+                    {weekly.filter((title) => title.type === "Series").length}{" "}
+                    of 1 series.
+                    {weekly.length < 6 &&
+                      (live
+                        ? " The current catalogue and filters leave some slots unfilled."
+                        : " The demo catalogue has no more eligible picks for the remaining slots.")}
+                  </p>
+                )}
+                {live &&
+                  region &&
+                  services.length > 0 &&
+                  !!catalogue.data &&
+                  weekly.length < 6 && (
+                    <button className="text-button" onClick={catalogue.retry}>
+                      Refresh catalogue
+                    </button>
+                  )}
+                {replacementMessage && (
+                  <p role="status">{replacementMessage}</p>
+                )}
+                {inactive.length > 0 && (
+                  <details className="weekly-inactive">
+                    <summary>
+                      Watched, rejected or unverified picks ({inactive.length})
+                    </summary>
+                    <ul className="dna-list">
+                      {inactive.map((pick) => (
+                        <li key={pick.id}>
+                          <span>
+                            {pick.name} ·{" "}
+                            {watched.includes(pick.id)
+                              ? "Watched"
+                              : feedback.rejected[pick.id]
+                                ? "Not interested"
+                                : "Availability unverified"}
+                          </span>
+                          <button
+                            className="text-button"
+                            onClick={() => replace(pick.id)}
+                            aria-label={"Replace " + pick.name}
+                          >
+                            Replace
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
               </section>
               <section className="quick-actions" aria-label="Discovery tools">
                 <button onClick={() => open("dice")}>
@@ -1032,6 +1128,17 @@ function App() {
               </div>
             </>
           )}
+          {page === "movie-dna" && (
+            <MovieDnaPage
+              profile={profile}
+              feedback={feedback}
+              history={weeks.filter((entry) => entry.week < week)}
+              edit={() => open("edit-dna")}
+              retake={() => open("onboard")}
+              onRate={rate}
+              onRestore={reject}
+            />
+          )}
           {page === "profile" && (
             <>
               <h1>Profile</h1>
@@ -1053,6 +1160,11 @@ function App() {
                 >
                   <Settings size={18} /> Edit viewing preferences
                 </button>
+                <p>
+                  <a className="text-button" href="#movie-dna">
+                    View Movie DNA
+                  </a>
+                </p>
               </div>
             </>
           )}
@@ -1145,17 +1257,22 @@ function App() {
           )}
       </nav>
 
-      {overlay === "onboard" && (
-        <Onboarding
-          profile={profile}
-          live={live}
-          close={close}
-          save={(value) => {
-            setProfile(value);
-            close();
-            location.hash = "profile";
-          }}
-        />
+      {(overlay === "onboard" || overlay === "edit-dna") && (
+        <Modal title="Set up your Movie DNA" close={close}>
+          <MovieDnaQuestionnaire
+            profile={profile}
+            live={live}
+            feedback={feedback}
+            review={overlay === "edit-dna"}
+            close={close}
+            save={(value, updatedFeedback) => {
+              setProfile(value);
+              setFeedback(updatedFeedback);
+              close();
+              location.hash = "movie-dna";
+            }}
+          />
+        </Modal>
       )}
       {overlay === "notifications" && (
         <Modal title="Notifications" close={close}>
@@ -1258,15 +1375,7 @@ function App() {
                 <div>
                   <h3>{result.name}</h3>
                   <p>
-                    {[
-                      result.genre,
-                      result.time,
-                      result.score === undefined
-                        ? undefined
-                        : result.score + "% demo match",
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
+                    {[result.genre, result.time].filter(Boolean).join(" · ")}
                   </p>
                   <p>
                     {live
@@ -1317,6 +1426,18 @@ function App() {
             title={overlay}
             country={profile.country}
           />
+          <div className="title-feedback">
+            <RatingInput title={overlay} feedback={feedback} onRate={rate} />
+            <button
+              className="button secondary"
+              aria-pressed={Object.hasOwn(feedback.rejected, overlay.id)}
+              onClick={() => reject(overlay)}
+            >
+              {Object.hasOwn(feedback.rejected, overlay.id)
+                ? "Undo not interested"
+                : "Not interested"}
+            </button>
+          </div>
           <div className="actions">
             <button
               className="button primary"

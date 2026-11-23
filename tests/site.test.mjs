@@ -1,13 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { existsSync } from "node:fs";
+import process from "node:process";
 import { chromium, devices } from "playwright-core";
 
 const browsers = [
   ["Chrome", "C:/Program Files/Google/Chrome/Application/chrome.exe"],
   ["Edge", "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"],
 ];
-const url = "http://127.0.0.1:5173/";
+const url = process.env.WATCHQUEST_TEST_URL ?? "http://127.0.0.1:5173/";
 
 for (const [name, path] of browsers) {
   test(
@@ -80,15 +81,40 @@ for (const [name, path] of browsers) {
         );
         await page.keyboard.press("Escape");
 
-        await desktopNav.getByRole("button", { name: "Movie DNA" }).click();
-        await dialog.getByRole("button", { name: "Continue as guest" }).click();
+        await desktopNav.getByRole("link", { name: "Movie DNA" }).click();
+        await page
+          .getByRole("button", { name: "Retake questionnaire" })
+          .click();
         await dialog.getByLabel("Display name (optional)").fill("Demo Viewer");
         await dialog.getByLabel("Viewing country").selectOption("Ireland");
-        await dialog
-          .getByRole("button", { name: "Continue", exact: true })
-          .click();
+        await dialog.getByRole("button", { name: "Next", exact: true }).click();
         await dialog.getByRole("button", { name: "Thriller" }).click();
-        await dialog.getByRole("button", { name: "Save preferences" }).click();
+        await dialog.getByRole("button", { name: "Next", exact: true }).click();
+        assert.ok(
+          await dialog.getByRole("button", { name: "Thriller" }).isDisabled(),
+        );
+        await dialog
+          .getByRole("button", { name: "Drama", exact: true })
+          .click();
+        await dialog.getByRole("button", { name: "Back", exact: true }).click();
+        assert.equal(
+          await dialog
+            .getByRole("button", { name: "Thriller" })
+            .getAttribute("aria-pressed"),
+          "true",
+        );
+        await dialog.getByRole("button", { name: "Next", exact: true }).click();
+        for (let remaining = 6; remaining > 0; remaining--) {
+          await dialog
+            .getByRole("button", { name: "Skip", exact: true })
+            .click();
+        }
+        await dialog.getByRole("button", { name: "Save Movie DNA" }).click();
+        await page
+          .locator(".dna-summary")
+          .getByText("Thriller", { exact: true })
+          .waitFor();
+        await desktopNav.getByRole("link", { name: "Profile" }).click();
         await page.getByRole("heading", { name: "Demo Viewer" }).waitFor();
         await page.reload();
         assert.ok(
@@ -122,7 +148,9 @@ for (const [name, path] of browsers) {
           ),
         );
         await mobileNav.getByRole("link", { name: "Profile" }).click();
-        await mobile.getByRole("link", { name: "Achievements" }).click();
+        await mobileNav
+          .getByRole("link", { name: "Achievements", exact: true })
+          .click();
         await mobile.getByRole("heading", { name: "Achievements" }).waitFor();
         await mobileNav.getByRole("link", { name: "Profile" }).click();
         await mobile.getByRole("link", { name: "Premium" }).click();
@@ -140,6 +168,26 @@ for (const [name, path] of browsers) {
               globalThis.innerWidth,
           ),
         );
+        await mobile
+          .locator(".hero")
+          .getByRole("link", { name: "Movie DNA" })
+          .click();
+        await mobile
+          .getByRole("button", { name: "Retake questionnaire" })
+          .click();
+        const mobileWizard = mobile.getByRole("dialog");
+        await mobileWizard
+          .getByRole("button", { name: "Next", exact: true })
+          .click();
+        await mobileWizard
+          .getByRole("heading", { name: "Favourite genres" })
+          .waitFor();
+        assert.ok(
+          await mobileWizard.evaluate(
+            (element) => element.scrollWidth <= element.clientWidth + 1,
+          ),
+        );
+        await mobile.keyboard.press("Escape");
         await page.setViewportSize({ width: 810, height: 1080 });
         await page.goto(url);
         await page
@@ -185,7 +233,7 @@ test(
           globalThis.localStorage.setItem("sg-phase1-saved", '["orbit"]');
           globalThis.localStorage.setItem(
             "sg-phase1-profile",
-            '{"name":"Guest","country":"Ireland","genres":[]}',
+            '{"name":"Guest","country":"Ireland","genres":["Sci-fi"]}',
           );
         }
       });
@@ -223,7 +271,23 @@ test(
         const endpoint = new globalThis.URL(request.request().url());
         let json;
         if (endpoint.pathname.endsWith("/status")) json = { enabled: true };
-        else if (endpoint.pathname.endsWith("/motn-legacy-series")) {
+        else if (endpoint.pathname.endsWith("/services")) {
+          assert.equal(endpoint.searchParams.get("country"), "ie");
+          json = { services: [{ id: "netflix", name: "Netflix" }] };
+        } else if (endpoint.pathname.endsWith("/favourites")) {
+          if (endpoint.searchParams.get("q") === "Unavailable") {
+            await request.fulfill({
+              status: 429,
+              json: { code: "local_quota" },
+            });
+            return;
+          }
+          json = {
+            titles: [
+              { ...film, id: "motn-favourite", name: "Favourite Fixture" },
+            ],
+          };
+        } else if (endpoint.pathname.endsWith("/motn-legacy-series")) {
           legacyLookups.push("series");
           json = { title: { id: "motn-legacy-series", type: "Series" } };
         } else if (endpoint.pathname.endsWith("/motn-fixture-film")) {
@@ -247,7 +311,8 @@ test(
           }
           json = {
             titles:
-              endpoint.searchParams.get("services") === "netflix"
+              endpoint.searchParams.get("services") === "netflix" &&
+              endpoint.searchParams.get("kind") !== "series"
                 ? [
                     query === "Fixture"
                       ? { ...film, name: "Current result" }
@@ -263,12 +328,46 @@ test(
         .getByRole("button", { name: "Set viewing country and subscriptions" })
         .click();
       const setup = page.getByRole("dialog");
-      await setup.getByRole("button", { name: "Continue as guest" }).click();
       await setup.getByRole("button", { name: "Netflix", exact: true }).click();
+      await setup.getByRole("button", { name: "Next", exact: true }).click();
+      assert.equal(
+        await setup
+          .getByRole("button", { name: "Science Fiction" })
+          .getAttribute("aria-pressed"),
+        "true",
+      );
+      await setup.getByRole("button", { name: "Next", exact: true }).click();
+      for (let remaining = 5; remaining > 0; remaining--) {
+        await setup.getByRole("button", { name: "Skip", exact: true }).click();
+      }
+      const favouriteSearch = setup.getByRole("search", {
+        name: "Find favourite titles",
+      });
+      await favouriteSearch
+        .getByLabel("Search films and series")
+        .fill("Unavailable");
+      await favouriteSearch.getByRole("button", { name: "Search" }).click();
       await setup
-        .getByRole("button", { name: "Continue", exact: true })
-        .click();
-      await setup.getByRole("button", { name: "Save preferences" }).click();
+        .getByText(/local catalogue request allowance is exhausted/)
+        .waitFor();
+      await favouriteSearch
+        .getByLabel("Search films and series")
+        .fill("Favourite");
+      await favouriteSearch.getByRole("button", { name: "Search" }).click();
+      const addFavourite = setup.getByRole("button", {
+        name: "Add Favourite Fixture to favourites",
+      });
+      await addFavourite.click();
+      assert.ok(await addFavourite.isDisabled());
+      await setup
+        .getByLabel("Your rating for Favourite Fixture")
+        .selectOption("9");
+      await setup.getByRole("button", { name: "Next", exact: true }).click();
+      await setup.getByRole("button", { name: "Save Movie DNA" }).click();
+      await page
+        .locator(".dna-summary")
+        .getByText("Favourite Fixture · 9/10")
+        .waitFor();
       await page
         .getByRole("navigation", { name: "Main navigation" })
         .getByRole("link", { name: "Home" })
@@ -294,6 +393,12 @@ test(
         .waitFor();
       await dialog.getByText("Additional paid channel").waitFor();
       await dialog.getByRole("button", { name: "Mark as watched" }).click();
+      await dialog
+        .getByLabel("Your rating for Provider Fixture")
+        .selectOption("8");
+      await dialog
+        .getByRole("button", { name: "Not interested", exact: true })
+        .click();
       await page.keyboard.press("Escape");
       const navigation = page.getByRole("navigation", {
         name: "Main navigation",
@@ -320,6 +425,16 @@ test(
       await page.reload();
       await unlocked.waitFor();
       assert.deepEqual(legacyLookups, ["series", "film"]);
+      await navigation.getByRole("link", { name: "Movie DNA" }).click();
+      await page
+        .getByRole("button", { name: "Restore Provider Fixture" })
+        .click();
+      await page
+        .getByLabel("Your rating for Provider Fixture")
+        .selectOption("");
+      await page
+        .getByLabel("Your rating for Provider Fixture")
+        .waitFor({ state: "detached" });
       await page
         .getByRole("navigation", { name: "Main navigation" })
         .getByRole("link", { name: "My Watchlist" })
@@ -355,6 +470,97 @@ test(
         .getByRole("button", { name: "View Provider Fixture" })
         .waitFor();
       assert.equal(await page.getByRole("searchbox").inputValue(), "");
+    } finally {
+      await browser.close();
+    }
+  },
+);
+
+test(
+  "weekly replacement changes one slot, survives reload and keeps the old week in history",
+  {
+    skip: !existsSync(browsers[0][1]),
+  },
+  async () => {
+    const browser = await chromium.launch({ executablePath: browsers[0][1] });
+    try {
+      const page = await browser.newPage();
+      let checkedAt = "2026-11-23T12:00:00.000Z";
+      await page.clock.setFixedTime(new Date(checkedAt));
+      await page.addInitScript(() => {
+        if (!globalThis.localStorage.getItem("sg-phase1-profile")) {
+          globalThis.localStorage.setItem(
+            "sg-phase1-profile",
+            '{"name":"Guest","country":"United Kingdom","genres":["Drama"],"subscriptions":{"gb":["netflix"]}}',
+          );
+        }
+      });
+      await page.route("**/api/catalogue**", async (request) => {
+        const endpoint = new globalThis.URL(request.request().url());
+        if (endpoint.pathname.endsWith("/status")) {
+          await request.fulfill({ json: { enabled: true } });
+          return;
+        }
+        const titles = Array.from({ length: 7 }, (_, index) => ({
+          id: "motn-weekly-" + index,
+          name: "Weekly fixture " + index,
+          type: index === 6 ? "Series" : "Film",
+          genre: "Drama",
+          source: "movie-of-the-night",
+          availability: {
+            state: "checked",
+            checkedAt,
+            country: "gb",
+            offers: [
+              {
+                type: "subscription",
+                service: "Netflix",
+                serviceId: "netflix",
+              },
+            ],
+          },
+        }));
+        await request.fulfill({ json: { titles } });
+      });
+      const weekly = page.locator(".weekly");
+      const names = () => weekly.locator(".card h3").allTextContents();
+      await page.goto(url);
+      await weekly.getByText("Week of 2026-11-23", { exact: false }).waitFor();
+      await weekly
+        .getByRole("button", { name: "Replace Weekly fixture 0" })
+        .click();
+      await weekly.getByText("Replaced one pick.", { exact: false }).waitFor();
+      const expected = [
+        "Weekly fixture 5",
+        "Weekly fixture 1",
+        "Weekly fixture 2",
+        "Weekly fixture 3",
+        "Weekly fixture 4",
+        "Weekly fixture 6",
+      ];
+      assert.deepEqual(await names(), expected);
+      await page.reload();
+      await weekly
+        .getByRole("button", { name: "View Weekly fixture 5" })
+        .waitFor();
+      assert.deepEqual(await names(), expected);
+      checkedAt = "2026-11-30T00:01:00.000Z";
+      await page.clock.setFixedTime(new Date(checkedAt));
+      await page.reload();
+      await weekly.getByText("Week of 2026-11-30", { exact: false }).waitFor();
+      await weekly
+        .getByRole("button", { name: "View Weekly fixture 0" })
+        .waitFor();
+      await page
+        .getByRole("navigation", { name: "Main navigation" })
+        .getByRole("link", { name: "Movie DNA" })
+        .click();
+      await page.getByText("Week of 2026-11-23", { exact: false }).click();
+      await page
+        .getByText("Replaced during the week: Weekly fixture 0", {
+          exact: true,
+        })
+        .waitFor();
     } finally {
       await browser.close();
     }

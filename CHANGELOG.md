@@ -1,5 +1,11 @@
 # Changelog
 
+## Phase 3 · Movie DNA 2.0
+
+- Added the nine-step questionnaire and a dedicated profile with saved preferences, ratings, feedback and weekly history.
+- Ranked eligible weekly picks with deterministic, documented rules, evidence-based explanations and personal predictions when sufficient ratings exist.
+- Added individual replacements, watched and rating actions, and reversible rejections. Retained WatchQuest branding and the existing browser data.
+
 ## Phase 2.2 · WatchQuest
 
 - Backed up the Phase 2.1 checkpoint to GitHub.
