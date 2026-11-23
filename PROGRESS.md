@@ -1,5 +1,13 @@
 # Progress and asset audit
 
+## Phase 2.1 · 23 November 2026
+
+- Movie of the Night is the primary metadata and regional streaming provider. The previous audit verified a single UK Netflix request without TMDB and received 20 eligible titles. No additional live request was needed for these regression fixes.
+- Clearing search or leaving Discover resets the submitted query. Cancelled searches cannot replace the current results. First Film recognises native provider IDs and retains the original watched list. Existing native IDs are resolved only when needed for the achievement.
+- Updated the [provider guide](DATA_PROVIDERS.md) with the direct free-plan setup, the 450-request rolling 31-day cap, artwork restrictions and the Wikidata and TVmaze review. Added targeted credential ignores.
+- Lint, TypeScript, the production build and all nine tests passed, including desktop and phone-width checks in Chrome and Edge.
+- Outstanding checks remain for real mobile Safari, additional live markets and commercial artwork clearance. The WatchQuest rebrand and Phase 3 remain outside this checkpoint.
+
 ## Phase 2 · 20 November 2026
 
 - Phase 1 approved. Added opt-in TMDB metadata and a Movie of the Night country-offer adapter. Search, weekly picks, Roll the Dice and Spin to Watch use the configured catalogue. Earlier saves, viewing history and profile settings retain their original browser keys.

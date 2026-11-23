@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -369,6 +369,9 @@ function App() {
   const [page, setPage] = useState(activePage);
   const [saved, setSaved] = useLocal<string[]>("saved", []);
   const [watched, setWatched] = useLocal<string[]>("watched", []);
+  const [watchedTypes, setWatchedTypes] = useLocal<
+    Record<string, Title["type"]>
+  >("watched-types", {});
   const [profile, setProfile] = useLocal("profile", defaultProfile);
   const [query, setQuery] = useState("");
   const [submitted, setSubmitted] = useState("");
@@ -429,17 +432,69 @@ function App() {
   const genres = [
     ...new Set(browse.flatMap((title) => title.genres ?? [title.genre])),
   ];
+  const firstFilm = watched.some(
+    (id) =>
+      id.startsWith("tmdb-movie-") ||
+      watchedTypes[id] === "Film" ||
+      demoTitles.some((title) => title.id === id && title.type === "Film"),
+  );
 
   useEffect(() => {
+    if (!live || page !== "achievements" || firstFilm) return;
+    const unknown = watched.filter(
+      (id) => id.startsWith("motn-") && !watchedTypes[id],
+    );
+    if (!unknown.length) return;
+    const controller = new AbortController();
+    const resolveTypes = async () => {
+      const resolved: Record<string, Title["type"]> = {};
+      for (const id of new Set(unknown)) {
+        if (controller.signal.aborted) return;
+        try {
+          const response = await fetch(
+            "/api/catalogue/" + encodeURIComponent(id),
+            { signal: controller.signal },
+          );
+          if (response.status === 429) break;
+          if (!response.ok) continue;
+          const { title } = (await response.json()) as { title?: Title };
+          if (
+            title?.id !== id ||
+            (title.type !== "Film" && title.type !== "Series")
+          )
+            continue;
+          resolved[id] = title.type;
+          if (title.type === "Film") break;
+        } catch {
+          if (controller.signal.aborted) return;
+          break;
+        }
+      }
+      if (!controller.signal.aborted && Object.keys(resolved).length) {
+        setWatchedTypes((previous) => ({ ...resolved, ...previous }));
+      }
+    };
+    void resolveTypes();
+    return () => controller.abort();
+  }, [live, page, firstFilm, watched, watchedTypes, setWatchedTypes]);
+
+  const clearSearch = useCallback(() => {
+    setQuery("");
+    setSubmitted("");
+    setGenre("All");
+  }, []);
+  useEffect(() => {
     const navigate = () => {
-      setPage(activePage());
+      const nextPage = activePage();
+      if (nextPage !== "discover") clearSearch();
+      setPage(nextPage);
       window.scrollTo(0, 0);
       if (document.activeElement !== search.current)
         main.current?.focus({ preventScroll: true });
     };
     window.addEventListener("hashchange", navigate);
     return () => window.removeEventListener("hashchange", navigate);
-  }, []);
+  }, [clearSearch]);
   useEffect(() => () => window.clearTimeout(spinTimer.current), []);
   useEffect(() => {
     document.title =
@@ -454,12 +509,15 @@ function App() {
         ? previous.filter((value) => value !== id)
         : [...previous, id],
     );
-  const toggleWatched = (id: string) =>
+  const toggleWatched = ({ id, type }: Title) => {
+    if (id.startsWith("motn-"))
+      setWatchedTypes((previous) => ({ ...previous, [id]: type }));
     setWatched((previous) =>
       previous.includes(id)
         ? previous.filter((value) => value !== id)
         : [...previous, id],
     );
+  };
   const close = () => {
     window.clearTimeout(spinTimer.current);
     setSpinning(false);
@@ -639,7 +697,7 @@ function App() {
               onChange={(event) => {
                 setQuery(event.target.value);
                 setGenre("All");
-                if (!event.target.value) setSubmitted("");
+                if (!event.target.value.trim()) setSubmitted("");
                 if (!live && page !== "discover") location.hash = "discover";
               }}
             />
@@ -688,10 +746,7 @@ function App() {
                     <a
                       className="button primary"
                       href="#discover"
-                      onClick={() => {
-                        setQuery("");
-                        setGenre("All");
-                      }}
+                      onClick={clearSearch}
                     >
                       <Play size={17} /> Find something to watch
                     </a>
@@ -714,13 +769,7 @@ function App() {
                         : "Five films and one series from the fictional demo catalogue."}
                     </p>
                   </div>
-                  <a
-                    href="#discover"
-                    onClick={() => {
-                      setQuery("");
-                      setGenre("All");
-                    }}
-                  >
+                  <a href="#discover" onClick={clearSearch}>
                     Browse all <ArrowRight size={16} />
                   </a>
                 </div>
@@ -810,13 +859,7 @@ function App() {
                   ) : (
                     <p>Try a different search or genre.</p>
                   )}
-                  <button
-                    className="button secondary"
-                    onClick={() => {
-                      setQuery("");
-                      setGenre("All");
-                    }}
-                  >
+                  <button className="button secondary" onClick={clearSearch}>
                     Clear filters
                   </button>
                 </div>
@@ -865,10 +908,7 @@ function App() {
                   <a
                     href="#discover"
                     className="button primary"
-                    onClick={() => {
-                      setQuery("");
-                      setGenre("All");
-                    }}
+                    onClick={clearSearch}
                   >
                     Browse the catalogue
                   </a>
@@ -939,14 +979,8 @@ function App() {
                   },
                   {
                     name: "First Film",
-                    desc: "Mark a demo film as watched.",
-                    done: watched.some(
-                      (id) =>
-                        id.startsWith("tmdb-movie-") ||
-                        demoTitles.some(
-                          (title) => title.id === id && title.type === "Film",
-                        ),
-                    ),
+                    desc: "Mark a film as watched.",
+                    done: firstFilm,
                   },
                 ].map((item) => (
                   <div className="panel" key={item.name}>
@@ -1196,7 +1230,7 @@ function App() {
             <button
               className="button secondary"
               aria-pressed={watched.includes(overlay.id)}
-              onClick={() => toggleWatched(overlay.id)}
+              onClick={() => toggleWatched(overlay)}
             >
               <Check size={17} />
               {watched.includes(overlay.id)

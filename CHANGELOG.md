@@ -1,5 +1,11 @@
 # Changelog
 
+## 23 November 2026 · Phase 2.1
+
+- Fixed live search resets and stale responses, and restored First Film for native Movie of the Night IDs.
+- Documented the primary provider, free-plan budget and optional metadata sources, and added secret ignore rules.
+- Made the achievement browser assertion wait for the rendered result.
+
 ## 20 November 2026 · Phase 2
 
 - Added opt-in TMDB metadata and Movie of the Night availability behind a local server API.

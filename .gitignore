@@ -8,6 +8,20 @@
 .env.*
 !.env.example
 
+# Local AWS credentials and private keys
+/.aws/credentials
+/.aws/config
+/.aws/sso/cache/
+/.aws/cli/cache/
+*.key
+*.p12
+*.pfx
+*.private.pem
+*-private.pem
+private-key.pem
+id_rsa
+id_ed25519
+
 # Local dependencies and generated output
 node_modules/
 /.movieofthenight-usage.json*

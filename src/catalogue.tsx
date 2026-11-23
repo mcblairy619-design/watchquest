@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Film } from "lucide-react";
 
 export type Title = {
@@ -35,14 +35,19 @@ export const subscriptionServices = [
 ] as const;
 
 export function useCatalogueRequest<T>(path: string | undefined, delay = 0) {
+  const [attempt, setAttempt] = useState(0);
+  const request = useMemo(
+    () => ({ path, delay, attempt }),
+    [path, delay, attempt],
+  );
   const [result, setResult] = useState<{
-    path: string;
+    request: typeof request;
     data?: T;
     error?: string;
   }>();
-  const [retry, setRetry] = useState(0);
   useEffect(() => {
-    if (!path) return;
+    if (!request.path) return;
+    const path = request.path;
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       try {
@@ -54,31 +59,29 @@ export function useCatalogueRequest<T>(path: string | undefined, delay = 0) {
               : "Could not load catalogue information.",
           );
         const data: T = await response.json();
-        if (!controller.signal.aborted) setResult({ path, data });
+        if (!controller.signal.aborted) setResult({ request, data });
       } catch (error) {
         if (!controller.signal.aborted)
           setResult({
-            path,
+            request,
             error:
               error instanceof Error
                 ? error.message
                 : "Could not load catalogue information.",
           });
       }
-    }, delay);
+    }, request.delay);
     return () => {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [path, delay, retry]);
+  }, [request]);
+  const current = result?.request === request ? result : undefined;
   return {
-    data: result?.path === path ? result?.data : undefined,
-    error: result?.path === path ? result?.error : undefined,
-    loading: !!path && result?.path !== path,
-    retry: () => {
-      setResult(undefined);
-      setRetry((value) => value + 1);
-    },
+    data: current?.data,
+    error: current?.error,
+    loading: !!path && !current,
+    retry: () => setAttempt((value) => value + 1),
   };
 }
 

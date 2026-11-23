@@ -5,6 +5,7 @@
 | 0 | Inventory assets and tools, verify licences and document risks, costs and future accounts. Record verification and create a checkpoint. |
 | 1 | Responsive React/TypeScript/Vite shell using approved SG branding, desktop sidebar, mobile tabs, accessible controls and clear empty states. Verify build and responsive navigation. |
 | 2 | Choose permitted providers and build server-side metadata and availability adapters. Verify attribution, regional offers, timestamp and link handling. |
+| 2.1 | Verify Movie of the Night without TMDB, document the free-plan cap and supplementary sources, and fix the audited regressions. |
 | 3 | Implement Supabase accounts, persistence, access policies and basic guest/onboarding flows. Verify account isolation and recovery. |
 | 4 | Implement Movie DNA, feedback and weekly recommendations. Verify eligibility, quotas, history, replacement and prediction tracking. |
 | 5 | Build Roll the Dice, Spin to Watch and initial discovery. Verify filters, exhausted pools, rotation, fair wheel and reduced motion. |
@@ -19,4 +20,4 @@
 | 14 | Launch approved hosting and installable PWA. Verify deployment, installation and operational readiness. |
 | 15 | Evaluate native iOS and Android releases with shared APIs and domain logic. |
 
-Phases 0 and 1 were approved. Phase 2 implementation is ready for review, with live verification awaiting owner-provided credentials. Phase 3 is awaiting owner approval. See [PROGRESS.md](PROGRESS.md) for verification status.
+The Phase 2.1 checkpoint is ready for review. Phase 3 is awaiting owner approval. See [PROGRESS.md](PROGRESS.md) for verification status.
