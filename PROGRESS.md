@@ -1,5 +1,12 @@
 # Progress and asset audit
 
+## Live catalogue reliability · 23 November 2026
+
+- Confirmed live mode on the normal local server. One budgeted primary catalogue diagnostic returned HTTP 200 and 20 verified UK Netflix titles, taking the ledger from 58 to 59 of 450 requests. Historical provider failures were not recorded, so the initial trigger could not be confirmed.
+- Fixed the browser's failure to retry a failed connection on reconnection. Separated connection and provider failures from a successful verification with no eligible titles. Earlier picks stay stored while verification is unavailable.
+- Reviewed artwork terms. Movie of the Night does not grant rights to third-party posters. The cards retain branded placeholders and existing cleared images. See [artwork options and conditions](DATA_PROVIDERS.md).
+- ESLint, TypeScript, production build and 22 tests passed using mocked provider responses. Browser coverage includes reconnect recovery, empty verified results, preservation of earlier data and a phone-width broken-image fallback.
+
 ## Phase 3 · Movie DNA 2.0
 
 - The latest owner brief moved browser-local personalisation into Phase 3. Supabase accounts and cross-device data are deferred.

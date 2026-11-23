@@ -477,6 +477,163 @@ test(
 );
 
 test(
+  "a reconnect restores the live dashboard and distinguishes empty or failed verification",
+  {
+    skip: !existsSync(browsers[0][1]),
+  },
+  async () => {
+    const browser = await chromium.launch({ executablePath: browsers[0][1] });
+    try {
+      const page = await browser.newPage({
+        viewport: { width: 390, height: 844 },
+      });
+      const checkedAt = "2026-11-23T12:00:00.000Z";
+      await page.clock.setFixedTime(new Date(checkedAt));
+      await page.addInitScript(() => {
+        globalThis.localStorage.setItem(
+          "sg-phase1-profile",
+          '{"name":"Guest","country":"United Kingdom","genres":["Drama"],"subscriptions":{"gb":["netflix"]}}',
+        );
+        globalThis.localStorage.setItem("sg-phase1-saved", '["orbit"]');
+        globalThis.localStorage.setItem("sg-phase1-watched", '["neon"]');
+        globalThis.localStorage.setItem(
+          "sg-phase1-movie-feedback",
+          '{"ratings":{"neon":{"title":{"id":"neon","name":"Neon District","type":"Film","genre":"Thriller"},"value":7}},"rejected":{}}',
+        );
+        globalThis.localStorage.setItem(
+          "sg-phase1-weekly-picks",
+          JSON.stringify([
+            {
+              week: "2026-11-23",
+              scope: "gb|netflix",
+              basedOnDna: true,
+              replaced: [],
+              picks: [
+                {
+                  id: "motn-previous",
+                  name: "Previous fixture",
+                  type: "Film",
+                  genre: "Drama",
+                  matches: [],
+                  reasons: [],
+                },
+              ],
+            },
+          ]),
+        );
+      });
+      await page.route("**/media/failing-poster.jpg", (request) =>
+        request.fulfill({ status: 404, body: "" }),
+      );
+      let checks = 0;
+      await page.route("**/api/catalogue**", async (request) => {
+        const endpoint = new globalThis.URL(request.request().url());
+        if (endpoint.pathname.endsWith("/status")) {
+          await request.fulfill({ json: { enabled: true } });
+          return;
+        }
+        assert.equal(endpoint.searchParams.get("country"), "gb");
+        assert.equal(endpoint.searchParams.get("services"), "netflix");
+        checks++;
+        if (checks === 1) {
+          await request.fulfill({
+            status: 502,
+            json: { code: "provider_connection" },
+          });
+          return;
+        }
+        const restored = Array.from({ length: 6 }, (_, index) => ({
+          id: index === 0 ? "motn-previous" : "motn-restored-" + index,
+          name: index === 0 ? "Previous fixture" : "Restored fixture " + index,
+          type: index === 5 ? "Series" : "Film",
+          genre: "Drama",
+          source: "movie-of-the-night",
+          poster: index === 0 ? "/media/failing-poster.jpg" : undefined,
+          availability: {
+            state: "checked",
+            country: "gb",
+            checkedAt,
+            offers: [
+              {
+                type: "subscription",
+                service: "Netflix",
+                serviceId: "netflix",
+              },
+            ],
+          },
+        }));
+        await request.fulfill({
+          json: { titles: checks === 2 ? [] : restored },
+        });
+      });
+      await page.goto(url);
+      const weekly = page.locator(".weekly");
+      await weekly
+        .getByText(
+          "Live catalogue check failed. Your previous picks are still saved.",
+        )
+        .waitFor();
+      await weekly
+        .getByText(/could not connect to the streaming provider/)
+        .waitFor();
+      await weekly.locator("summary").click();
+      await weekly
+        .getByText("Previous fixture · Availability check failed")
+        .waitFor();
+      assert.equal(checks, 1);
+      const second = page.waitForResponse((res) =>
+        new globalThis.URL(res.url()).searchParams.has("services"),
+      );
+      await page.evaluate(() =>
+        globalThis.dispatchEvent(new globalThis.Event("online")),
+      );
+      await second;
+      await weekly
+        .getByText(/The catalogue loaded. No verified recommendations/)
+        .waitFor();
+      assert.equal(checks, 2);
+      await weekly.getByRole("button", { name: "Refresh catalogue" }).click();
+      const restoredCard = weekly.getByRole("button", {
+        name: "View Previous fixture",
+      });
+      await restoredCard.scrollIntoViewIfNeeded();
+      await restoredCard.locator(".poster-placeholder").waitFor();
+      assert.equal(
+        await restoredCard.evaluate(
+          (element) => globalThis.getComputedStyle(element).aspectRatio,
+        ),
+        "2 / 3",
+      );
+      await weekly.getByText(/5 of 5 films.*1 of 1 series/).waitFor();
+      assert.equal(checks, 3);
+      assert.equal(
+        await page.evaluate(() =>
+          globalThis.localStorage.getItem("sg-phase1-saved"),
+        ),
+        '["orbit"]',
+      );
+      assert.equal(
+        await page.evaluate(() =>
+          globalThis.localStorage.getItem("sg-phase1-watched"),
+        ),
+        '["neon"]',
+      );
+      assert.equal(
+        await page.evaluate(
+          () =>
+            JSON.parse(
+              globalThis.localStorage.getItem("sg-phase1-movie-feedback"),
+            ).ratings.neon.value,
+        ),
+        7,
+      );
+    } finally {
+      await browser.close();
+    }
+  },
+);
+
+test(
   "weekly replacement changes one slot, survives reload and keeps the old week in history",
   {
     skip: !existsSync(browsers[0][1]),

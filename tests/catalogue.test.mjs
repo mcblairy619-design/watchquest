@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { URL } from "node:url";
-import { createCatalogue } from "../server/catalogue.mjs";
+import { catalogueMiddleware, createCatalogue } from "../server/catalogue.mjs";
 
 const env = {
   AVAILABILITY_TERMS_ACCEPTED: "yes",
@@ -36,6 +36,76 @@ const show = (id, streamingOptions) => ({
   runtime: 102,
   streamingOptions,
   imageSet: { verticalPoster: { w360: "https://example.com/poster.jpg" } },
+});
+
+async function browseHttp(middleware) {
+  const response = {
+    statusCode: 200,
+    headers: {},
+    setHeader(key, value) {
+      this.headers[key] = value;
+    },
+    end(payload) {
+      this.payload = JSON.parse(payload);
+    },
+  };
+  await middleware(
+    { method: "GET", url: "/api/catalogue?country=gb&services=netflix" },
+    response,
+    () => assert.fail(),
+  );
+  return response;
+}
+
+test("catalogue HTTP failures identify DNS, timeouts, provider access and malformed responses", async (t) => {
+  const cases = [
+    [
+      async () => {
+        throw new TypeError("UPSTREAM_PRIVATE_ERROR");
+      },
+      502,
+      "provider_connection",
+    ],
+    [
+      async () => {
+        throw new globalThis.DOMException("Timeout", "TimeoutError");
+      },
+      504,
+      "provider_timeout",
+    ],
+    [
+      async () => json({ message: "UPSTREAM_PRIVATE_ERROR" }, { status: 401 }),
+      502,
+      "provider_access",
+    ],
+    [async () => json({}, { status: 400 }), 400, "provider_query"],
+    [async () => json(null), 502, "provider_response"],
+  ];
+  for (const [fetcher, status, code] of cases) {
+    const result = await browseHttp(
+      catalogueMiddleware(env, fetcher, budget(t)),
+    );
+    assert.equal(result.statusCode, status);
+    assert.equal(result.payload.code, code);
+    assert.ok(
+      !JSON.stringify(result.payload).includes("UPSTREAM_PRIVATE_ERROR"),
+    );
+  }
+});
+
+test("catalogue fails closed if the budget ledger is locked or unreadable", async (t) => {
+  const locked = budget(t);
+  writeFileSync(locked + ".lock", "");
+  const busy = await browseHttp(catalogueMiddleware(env, assert.fail, locked));
+  assert.equal(busy.statusCode, 503);
+  assert.equal(busy.payload.code, "budget_busy");
+  const invalid = budget(t);
+  writeFileSync(invalid, "invalid");
+  const unavailable = await browseHttp(
+    catalogueMiddleware(env, assert.fail, invalid),
+  );
+  assert.equal(unavailable.statusCode, 503);
+  assert.equal(unavailable.payload.code, "budget_unavailable");
 });
 
 test("questionnaire services require a country and a genuine base subscription", async (t) => {

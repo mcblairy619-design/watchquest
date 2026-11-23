@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { Film } from "lucide-react";
 
 export type Title = {
   id: string;
@@ -34,6 +33,31 @@ export const subscriptionServices = [
   ["paramount", "Paramount+"],
 ] as const;
 
+const requestErrors: Record<string, string> = {
+  local_connection:
+    "Could not reach the local WatchQuest server. Check that Vite is running.",
+  local_response:
+    "The local WatchQuest server returned an unreadable catalogue response.",
+  provider_connection:
+    "WatchQuest could not connect to the streaming provider. Check your internet connection.",
+  provider_timeout: "The streaming provider took too long to respond.",
+  provider_access:
+    "The streaming provider refused access. Check the account and API key in your local settings.",
+  provider_query:
+    "The streaming provider could not use the selected country, services or search.",
+  provider_response:
+    "The streaming provider returned an unavailable or unexpected response.",
+  provider_limit:
+    "The streaming provider is limiting requests. Try again later.",
+  local_quota: "The local catalogue request allowance is exhausted.",
+  catalogue_disabled:
+    "Live catalogue access is disabled in the local server settings.",
+  budget_busy:
+    "Another catalogue request is updating the local budget. Try again shortly.",
+  budget_unavailable:
+    "WatchQuest could not record a request in its local budget. Check the project folder permissions.",
+};
+
 export function useCatalogueRequest<T>(path: string | undefined, delay = 0) {
   const [attempt, setAttempt] = useState(0);
   const request = useMemo(
@@ -44,42 +68,51 @@ export function useCatalogueRequest<T>(path: string | undefined, delay = 0) {
     request: typeof request;
     data?: T;
     error?: string;
+    reconnect?: boolean;
   }>();
   useEffect(() => {
     if (!request.path) return;
     const path = request.path;
     const controller = new AbortController();
+    const fail = (code: string | undefined, fallback: string) => {
+      if (controller.signal.aborted) return;
+      setResult({
+        request,
+        error:
+          code && Object.hasOwn(requestErrors, code)
+            ? requestErrors[code]
+            : fallback,
+        reconnect:
+          code === "local_connection" ||
+          code === "provider_connection" ||
+          code === "provider_timeout",
+      });
+    };
     const timer = window.setTimeout(async () => {
+      let response: Response;
       try {
-        const response = await fetch(path, { signal: controller.signal });
-        if (!response.ok) {
-          if (response.status === 429) {
-            const body = (await response.json().catch(() => null)) as {
-              code?: string;
-            } | null;
-            if (body?.code === "local_quota") {
-              throw new Error(
-                "The local catalogue request allowance is exhausted.",
-              );
-            }
-          }
-          throw new Error(
-            response.status === 429
-              ? "The data provider is busy. Try again later."
-              : "Could not load catalogue information.",
-          );
-        }
+        response = await fetch(path, { signal: controller.signal });
+      } catch {
+        fail("local_connection", "");
+        return;
+      }
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as {
+          code?: string;
+        } | null;
+        fail(
+          body?.code,
+          response.status === 429
+            ? "The data provider is busy. Try again later."
+            : "Could not load catalogue information.",
+        );
+        return;
+      }
+      try {
         const data: T = await response.json();
         if (!controller.signal.aborted) setResult({ request, data });
-      } catch (error) {
-        if (!controller.signal.aborted)
-          setResult({
-            request,
-            error:
-              error instanceof Error
-                ? error.message
-                : "Could not load catalogue information.",
-          });
+      } catch {
+        fail("local_response", "");
       }
     }, request.delay);
     return () => {
@@ -88,6 +121,12 @@ export function useCatalogueRequest<T>(path: string | undefined, delay = 0) {
     };
   }, [request]);
   const current = result?.request === request ? result : undefined;
+  useEffect(() => {
+    if (!current?.reconnect) return;
+    const retry = () => setAttempt((value) => value + 1);
+    window.addEventListener("online", retry, { once: true });
+    return () => window.removeEventListener("online", retry);
+  }, [current]);
   return {
     data: current?.data,
     error: current?.error,
@@ -100,11 +139,15 @@ export function Poster({ title }: { title: Title }) {
   const src = title.poster ?? (title.art && "/media/" + title.art + ".jpg");
   const [failed, setFailed] = useState<string>();
   return src && failed !== src ? (
-    <img alt="" src={src} loading="lazy" onError={() => setFailed(src)} />
+    <img
+      alt=""
+      src={src}
+      loading="lazy"
+      decoding="async"
+      onError={() => setFailed(src)}
+    />
   ) : (
-    <span className="poster-placeholder" aria-hidden="true">
-      <Film size={28} />
-    </span>
+    <span className="poster-placeholder" aria-hidden="true" />
   );
 }
 

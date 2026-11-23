@@ -15,6 +15,13 @@ class ProviderError extends Error {
   }
 }
 
+const accountErrorCodes = {
+  400: "provider_query",
+  401: "provider_access",
+  403: "provider_access",
+  422: "provider_query",
+};
+
 function createClient(base, headers, fetcher, limits, reserve = () => 0) {
   const cache = new Map();
   let coolingUntil = 0;
@@ -46,7 +53,16 @@ function createClient(base, headers, fetcher, limits, reserve = () => 0) {
       }
     }
     if (budgetWait) throw new ProviderError(429, Math.ceil(budgetWait / 1000));
-    const quotaWait = reserve();
+    let quotaWait;
+    try {
+      quotaWait = reserve();
+    } catch (error) {
+      throw new ProviderError(
+        503,
+        undefined,
+        error.code === "EEXIST" ? "budget_busy" : "budget_unavailable",
+      );
+    }
     if (quotaWait) throw new ProviderError(429, quotaWait, "local_quota");
     for (const window of windows) window.calls.push(now);
     if (cache.size >= 256) {
@@ -57,11 +73,23 @@ function createClient(base, headers, fetcher, limits, reserve = () => 0) {
     const entry = { expires: Infinity, active: true };
     entry.pending = (async () => {
       try {
-        const response = await fetcher(base + path, {
-          headers,
-          signal: globalThis.AbortSignal.timeout(8000),
-          redirect: "error",
-        });
+        const signal = globalThis.AbortSignal.timeout(8000);
+        let response;
+        try {
+          response = await fetcher(base + path, {
+            headers,
+            signal,
+            redirect: "error",
+          });
+        } catch (error) {
+          throw new ProviderError(
+            signal.aborted || error.name === "TimeoutError" ? 504 : 502,
+            undefined,
+            signal.aborted || error.name === "TimeoutError"
+              ? "provider_timeout"
+              : "provider_connection",
+          );
+        }
         if ([402, 429].includes(response.status)) {
           const raw = response.headers.get("Retry-After");
           const seconds = /^\d+$/.test(raw ?? "")
@@ -73,10 +101,21 @@ function createClient(base, headers, fetcher, limits, reserve = () => 0) {
               ? 3600
               : 60;
           coolingUntil = Date.now() + retry * 1000;
-          throw new ProviderError(429, retry);
+          throw new ProviderError(429, retry, "provider_limit");
         }
-        if (!response.ok) throw new ProviderError(response.status);
-        const data = await response.json();
+        if (!response.ok)
+          throw new ProviderError(
+            response.status,
+            undefined,
+            accountErrorCodes[response.status] ?? "provider_response",
+          );
+        const data = await response.json().catch(() => {
+          throw new ProviderError(
+            signal.aborted ? 504 : 502,
+            undefined,
+            signal.aborted ? "provider_timeout" : "provider_response",
+          );
+        });
         entry.expires = Date.now() + ttl;
         return { data, checkedAt: new Date().toISOString() };
       } catch (error) {
@@ -256,14 +295,16 @@ export function createCatalogue(env, fetcher = globalThis.fetch, budgetPath) {
       );
 
     if (url.pathname === "/api/catalogue/services") {
-      if (!available) throw new ProviderError(503);
+      if (!available)
+        throw new ProviderError(503, undefined, "catalogue_disabled");
       if (!validCountry) return { services: [] };
       const { data } = await streaming("/countries/" + country, ttl);
       if (
-        data.countryCode?.toLowerCase() !== country ||
+        typeof data?.countryCode !== "string" ||
+        data.countryCode.toLowerCase() !== country ||
         !Array.isArray(data.services)
       ) {
-        throw new ProviderError(502);
+        throw new ProviderError(502, undefined, "provider_response");
       }
       return {
         services: data.services
@@ -278,7 +319,8 @@ export function createCatalogue(env, fetcher = globalThis.fetch, budgetPath) {
     }
 
     if (url.pathname === "/api/catalogue/favourites") {
-      if (!available) throw new ProviderError(503);
+      if (!available)
+        throw new ProviderError(503, undefined, "catalogue_disabled");
       const query = (url.searchParams.get("q") ?? "").trim().toLowerCase();
       if (query.length > 100) throw new ProviderError(400);
       if (query.length < 2 || !validCountry) return { titles: [] };
@@ -286,7 +328,8 @@ export function createCatalogue(env, fetcher = globalThis.fetch, budgetPath) {
         "/shows/search/title?" + params({ country, title: query }),
         ttl,
       );
-      if (!Array.isArray(data)) throw new ProviderError(502);
+      if (!Array.isArray(data))
+        throw new ProviderError(502, undefined, "provider_response");
       const titles = data.map(fromStreaming).filter(Boolean);
       return {
         titles: [
@@ -301,7 +344,8 @@ export function createCatalogue(env, fetcher = globalThis.fetch, budgetPath) {
       if (query.length > 100) throw new ProviderError(400);
       if (kind && !["movie", "series"].includes(kind))
         throw new ProviderError(400);
-      if (!available) throw new ProviderError(503);
+      if (!available)
+        throw new ProviderError(503, undefined, "catalogue_disabled");
       const services = [
         ...new Set(
           (url.searchParams.get("services") ?? "").split(",").filter(Boolean),
@@ -326,8 +370,9 @@ export function createCatalogue(env, fetcher = globalThis.fetch, budgetPath) {
             ...(kind ? { show_type: kind } : {}),
           });
       const { data, checkedAt } = await streaming(route, ttl);
-      const shows = query ? data : data.shows;
-      if (!Array.isArray(shows)) throw new ProviderError(502);
+      const shows = query ? data : data?.shows;
+      if (!Array.isArray(shows))
+        throw new ProviderError(502, undefined, "provider_response");
       const titles = new Map();
       for (const show of shows) {
         const title = fromStreaming(show);
@@ -366,7 +411,7 @@ export function createCatalogue(env, fetcher = globalThis.fetch, budgetPath) {
     }
     if (!available) {
       if (availability) return { state: "unconfigured" };
-      throw new ProviderError(503);
+      throw new ProviderError(503, undefined, "catalogue_disabled");
     }
     if (availability && !validCountry) return { state: "unsupported" };
     try {
@@ -377,7 +422,7 @@ export function createCatalogue(env, fetcher = globalThis.fetch, budgetPath) {
           ? { state: "checked", checkedAt, offers }
           : { state: "unknown" };
       const title = fromStreaming(data);
-      if (!title) throw new ProviderError(502);
+      if (!title) throw new ProviderError(502, undefined, "provider_response");
       return {
         title: {
           ...title,
@@ -397,8 +442,8 @@ export function createCatalogue(env, fetcher = globalThis.fetch, budgetPath) {
   };
 }
 
-export function catalogueMiddleware(env) {
-  const run = createCatalogue(env);
+export function catalogueMiddleware(env, fetcher, budgetPath) {
+  const run = createCatalogue(env, fetcher, budgetPath);
   return async (req, res, next) => {
     const url = new URL(req.url, "http://localhost");
     if (
@@ -415,14 +460,14 @@ export function catalogueMiddleware(env) {
       }
       res.end(JSON.stringify(await run(url)));
     } catch (error) {
-      res.statusCode = [400, 404, 405, 429, 503].includes(error.status)
+      res.statusCode = [400, 404, 405, 429, 503, 504].includes(error.status)
         ? error.status
         : 502;
       if (error.retryAfter)
         res.setHeader("Retry-After", String(error.retryAfter));
       res.end(
         JSON.stringify({
-          code: error.code === "local_quota" ? error.code : undefined,
+          code: error instanceof ProviderError ? error.code : undefined,
           error:
             res.statusCode === 429
               ? "The data provider is busy. Try again later."

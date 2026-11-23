@@ -403,6 +403,10 @@ function App() {
   const inactive = weeklyRecord.picks.filter(
     (pick) => !activeTitles.has(pick.id),
   );
+  const checkingWeekly =
+    catalogue.loading || filmSupplement.loading || seriesSupplement.loading;
+  const weeklyError =
+    catalogue.error ?? filmSupplement.error ?? seriesSupplement.error;
   const browseRequest = searchPath ? searchResults : catalogue;
   const browse = searchPath
     ? (searchResults.data?.titles ?? []).filter((title) =>
@@ -832,6 +836,13 @@ function App() {
                     Browse all <ArrowRight size={16} />
                   </a>
                 </div>
+                {status.error && <RequestMessage {...status} />}
+                {catalogue.error && (
+                  <p className="weekly-note">
+                    Live catalogue check failed. Your previous picks are still
+                    saved.
+                  </p>
+                )}
                 <RequestMessage {...catalogue} />
                 {(filmSupplement.loading || seriesSupplement.loading) && (
                   <p role="status">
@@ -881,9 +892,14 @@ function App() {
                     {weekly.filter((title) => title.type === "Series").length}{" "}
                     of 1 series.
                     {weekly.length < 6 &&
-                      (live
-                        ? " The current catalogue and filters leave some slots unfilled."
-                        : " The demo catalogue has no more eligible picks for the remaining slots.")}
+                      !checkingWeekly &&
+                      (!live
+                        ? " The demo catalogue has no more eligible picks for the remaining slots."
+                        : weeklyError
+                          ? " A catalogue check failed, so some slots could not be verified."
+                          : weekly.length
+                            ? " The verified catalogue and filters leave some slots unfilled."
+                            : " The catalogue loaded. No verified recommendations match this selection.")}
                   </p>
                 )}
                 {live &&
@@ -912,7 +928,11 @@ function App() {
                               ? "Watched"
                               : feedback.rejected[pick.id]
                                 ? "Not interested"
-                                : "Availability unverified"}
+                                : checkingWeekly
+                                  ? "Checking availability"
+                                  : weeklyError
+                                    ? "Availability check failed"
+                                    : "Availability not confirmed by the current catalogue"}
                           </span>
                           <button
                             className="text-button"

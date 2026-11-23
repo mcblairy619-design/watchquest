@@ -11,12 +11,13 @@
   color-scheme: dark;
 }
 .poster-placeholder {
-  display: grid;
-  place-items: center;
+  display: block;
   width: 100%;
   height: 100%;
-  background: linear-gradient(145deg, #244771, #111827 75%);
-  color: #9ac5ee;
+  background:
+    url("/media/watchquest-shield.png") center 45% / min(36%, 82px) auto
+      no-repeat,
+    radial-gradient(ellipse at 50% 40%, #1c4064, #101827 72%);
 }
 .result .poster-placeholder {
   width: clamp(80px, 25vw, 130px);

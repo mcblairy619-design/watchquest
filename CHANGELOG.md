@@ -1,5 +1,10 @@
 # Changelog
 
+## Live catalogue reliability
+
+- Added reconnect recovery and separate messages for failed checks and successful checks with no eligible offers.
+- Improved the WatchQuest artwork fallback while keeping unverified poster artwork disabled.
+
 ## Phase 3 · Movie DNA 2.0
 
 - Added the nine-step questionnaire and a dedicated profile with saved preferences, ratings, feedback and weekly history.
