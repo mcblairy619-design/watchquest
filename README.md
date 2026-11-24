@@ -17,7 +17,7 @@ WatchQuest is a film and television discovery prototype with a browser-local Mov
 
 ## Run locally
 
-From the project folder, run `npm ci` on a fresh checkout, then `npm run dev`. Open [WatchQuest on this computer](http://127.0.0.1:5173/). If PowerShell blocks `npm`, use `npm.cmd` instead. Re-run `npm ci` rather than copying `node_modules` between Windows and Linux. Demo mode requires no API key.
+Use the Node.js version in [`.node-version`](.node-version). From the project folder, run `npm ci` on a fresh checkout, then `npm run dev`. Open [WatchQuest on this computer](http://127.0.0.1:5173/). If PowerShell blocks `npm`, use `npm.cmd` instead. Re-run `npm ci` rather than copying `node_modules` between Windows and Linux. Demo mode requires no API key.
 
 Open **Movie DNA** and choose **Retake questionnaire** to answer the nine steps, or **Edit Movie DNA** to jump to an answer from the review. Saved titles, watch history, ratings and preferences are stored in the browser you use.
 
@@ -33,4 +33,6 @@ Open **Movie DNA** and choose **Retake questionnaire** to answer the nine steps,
 
 ## Checks
 
-Run `npm run lint`, `npm run check`, `npm test` and `npm run build`. The production bundle goes to `dist/`. The browser tests currently look for Chrome and Edge at fixed Windows paths and skip when those executables are absent. To run them, start a local demo server before running `npm test`. If live providers are configured, disable them for the test server with `AVAILABILITY_FREE_PLAN=no` and `CATALOGUE_USE=disabled`.
+Run `npm run test:setup` once, and again after Playwright updates, to download the matching headless Chromium. On a supported Linux distribution that is missing browser libraries, run `npm run test:setup -- --with-deps`. Then run `npm test` on either OS. Browser tests start their own local demo server with provider access disabled; you don't need to stop your dev server or install Chrome or Edge. Use `npm run test:unit` to run the Node-only tests without Chromium.
+
+Run `npm run lint`, `npm run check` and `npm run build` for the other checks. The production bundle goes to `dist/`. GitHub Actions runs the same checks on Ubuntu and Windows for pull requests and pushes to `main`.

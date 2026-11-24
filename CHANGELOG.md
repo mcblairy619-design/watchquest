@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Grouped project documentation and frontend feature files. No changes to app behaviour or stored data.
+- Standardised Node and line endings for Windows and Linux, and added a two-OS CI workflow with portable browser tests.
 
 ## Live catalogue reliability
 

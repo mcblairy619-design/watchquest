@@ -1,5 +1,10 @@
 # Progress and asset audit
 
+## Windows and Linux development
+
+- Pinned the shared Node.js version and standardised text file line endings. The browser suite now uses Playwright-managed headless Chromium and starts a temporary local demo server, with provider responses mocked where needed.
+- A clean dependency install, ESLint, TypeScript, production build and all 21 tests passed on Linux with no skips, including desktop and phone-sized browser coverage. The new Ubuntu and Windows CI workflow passes actionlint; hosted execution and Windows results have not been verified yet.
+
 ## Repository organisation
 
 - Grouped catalogue and Movie DNA frontend modules by feature and moved project documentation into `docs/`. Runtime changes are limited to import paths; storage keys and provider handling were not touched.
