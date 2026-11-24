@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { URL } from "node:url";
-import { catalogueMiddleware, createCatalogue } from "../server/catalogue.mjs";
+import { catalogueMiddleware, createCatalogue } from "../apps/api/catalogue.mjs";
 
 const env = {
   AVAILABILITY_TERMS_ACCEPTED: "yes",

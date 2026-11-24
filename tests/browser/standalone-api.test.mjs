@@ -4,10 +4,11 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import process from "node:process";
+import { fileURLToPath, URL } from "node:url";
 import { chromium } from "playwright-core";
 import { test } from "node:test";
 import { build, preview } from "vite";
-import { createApiServer } from "../../server/http.mjs";
+import { createApiServer } from "../../apps/api/http.mjs";
 
 test("the built frontend reaches the standalone catalogue API through preview", { timeout: 15000 }, async (t) => {
   const outDir = await mkdtemp(join(tmpdir(), "watchquest-preview-"));
@@ -38,7 +39,8 @@ test("the built frontend reaches the standalone catalogue API through preview", 
   process.env.AVAILABILITY_FREE_PLAN = "no";
   process.env.CATALOGUE_USE = "disabled";
   process.env.WATCHQUEST_API_PROXY_TARGET = `http://127.0.0.1:${api.address().port}`;
-  const config = { mode: "test", logLevel: "silent", build: { outDir } };
+  const configFile = fileURLToPath(new URL("../../apps/web/vite.config.mjs", import.meta.url));
+  const config = { configFile, mode: "test", logLevel: "silent", build: { outDir } };
   await build(config);
   web = await preview({ ...config, preview: { host: "127.0.0.1", port: 0 } });
   const origin = `http://127.0.0.1:${web.httpServer.address().port}`;

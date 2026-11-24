@@ -1,21 +1,24 @@
 import { defineConfig, loadEnv } from "vite";
+import { resolve } from "node:path";
 import process from "node:process";
-import { catalogueMiddleware } from "./server/catalogue.mjs";
+import { catalogueMiddleware } from "./apps/api/catalogue.mjs";
+import webConfig from "./apps/web/vite.config.mjs";
 
-export default defineConfig(({ command, mode }) => {
-  if (command === "build") return {};
+// Keep the original one-command local workflow at the repository root.
+export default defineConfig((configEnv) => {
+  const config = webConfig(configEnv);
+  if (configEnv.command === "build" || config.server?.proxy) return config;
 
-  const target = process.env.WATCHQUEST_API_PROXY_TARGET?.trim();
-  if (target) {
-    const proxy = { "^/api/catalogue(?:[/?]|$)": { target } };
-    return { server: { proxy }, preview: { proxy } };
-  }
-
-  const middleware = catalogueMiddleware({
-    ...loadEnv(mode, process.cwd(), ["CATALOGUE_", "AVAILABILITY_"]),
-    ...process.env,
-  });
+  const middleware = catalogueMiddleware(
+    {
+      ...loadEnv(configEnv.mode, config.envDir, ["CATALOGUE_", "AVAILABILITY_"]),
+      ...process.env,
+    },
+    undefined,
+    resolve(config.envDir, ".movieofthenight-usage.json"),
+  );
   return {
+    ...config,
     plugins: [
       {
         name: "stream-guide-catalogue",

@@ -9,8 +9,8 @@ function sendError(response, status, error) {
   response.end(JSON.stringify({ error }));
 }
 
-export function createApiServer(env) {
-  const catalogue = catalogueMiddleware(env);
+export function createApiServer(env, budgetPath) {
+  const catalogue = catalogueMiddleware(env, undefined, budgetPath);
   return createServer((request, response) => {
     catalogue(request, response, () => sendError(response, 404, "Not found."))
       .catch((error) => {

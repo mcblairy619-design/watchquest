@@ -1,6 +1,6 @@
 # WatchQuest development roadmap — review draft
 
-This is a proposed revision of [ROADMAP.md](ROADMAP.md). Historical phase numbers are preserved. The near-term changes are to move WatchQuest into the `monostyle` monorepo before hosted staging and account work, and to make the invite beta an explicit milestone with clear acceptance criteria.
+This is a proposed revision of [ROADMAP.md](ROADMAP.md). Historical phase numbers are preserved. The near-term changes are to restructure the existing WatchQuest repository in place as a monorepo before hosted staging and account work, and to make the invite beta an explicit milestone with clear acceptance criteria.
 
 ## Release scope
 
@@ -27,16 +27,16 @@ See [PROGRESS.md](PROGRESS.md) for what was actually verified and [MOVIE_DNA.md]
 
 ## Phase 4 — Monorepo migration, hosted staging, accounts and private data
 
-**Status:** Awaiting owner approval. The migration is the first proposed checkpoint. Agree on the staging host, invite administration and any spending before starting the relevant work. Supabase Auth and PostgreSQL remain the planned account foundation.
+**Status:** The in-place migration is approved. Hosted staging and account work still require approval. Agree on the staging host, invite administration and any spending before starting the relevant work. Supabase Auth and PostgreSQL remain the planned account foundation.
 
-### 4.0 — Move WatchQuest into the monorepo without changing behaviour
+### 4.0 — Restructure the WatchQuest repository without changing behaviour
 
-- Start from WatchQuest's `refactor/monostyle-migration` branch. Move the existing React/Vite frontend and catalogue backend into `monostyle` as two independently runnable apps. Use `apps/web/` and `apps/api/` as the proposed paths, subject to the destination repo's conventions. The planned production origins are `watchquest.com` for the frontend and `api.watchquest.com` for the standalone Node API; public deployment is not part of this checkpoint.
+- Use WatchQuest's `refactor/monostyle-migration` branch to move the React/Vite frontend and catalogue backend into `apps/web/` and `apps/api/` in the existing repository. Each app runs independently. The planned production origins are `watchquest.com` for the frontend and `api.watchquest.com` for the standalone Node API; public deployment is not part of this checkpoint.
 - Keep React organised by feature and have it call the API over HTTP, without importing server code. Reuse the existing provider adapters and request-budget logic behind a thin HTTP entry point. Keep `/api/catalogue` and its response behaviour intact. Use a feature-oriented MVC-style split in the API: controllers handle HTTP, services hold business rules, and adapters or repositories handle data access. Do not rewrite working catalogue or Movie DNA logic to fit that structure.
-- Integrate both apps with the destination workspace, lockfile and CI. Keep setup and checks documented for Windows and Linux. Preserve guest mode, browser storage keys, saved title IDs and weekly history. Keep the existing local frontend origin where practical: changing the scheme, hostname or port leaves browser saves on the old origin. If the intended cutover changes origin, document how existing saves will remain accessible or be transferred; do not assume that preserving keys is enough.
+- Use one npm workspace lockfile and the existing root CI checks. Keep setup and checks documented for Windows and Linux. Preserve guest mode, browser storage keys, saved title IDs and weekly history. Keep the existing local frontend origin where practical: changing the scheme, hostname or port leaves browser saves on the old origin. If the intended cutover changes origin, document how existing saves will remain accessible or be transferred; do not assume that preserving keys is enough.
 - Keep this checkpoint limited to the move and wiring. No accounts, database schema changes, UI redesign or provider switch.
 
-**Evidence:** The API starts without Vite and the built frontend works against it. The existing catalogue route, fictional guest demo, saved titles, Movie DNA and weekly history still work. Lint, type checks, automated tests and the production build pass in the destination workspace, with Windows and Ubuntu CI and no live provider calls. Record the source revision, verification results and how to return to the standalone checkout if the move needs to be reversed.
+**Evidence:** The API starts without Vite and the built frontend works against it. The existing catalogue route, fictional guest demo, saved titles, Movie DNA and weekly history still work. Lint, type checks, automated tests and the production build pass from the repository root, with Windows and Ubuntu CI and no live provider calls. Record the source revision, verification results and the pre-restructure commit as a rollback point.
 
 ### 4.1 — Deploy a private staging environment
 
@@ -121,7 +121,7 @@ See [PROGRESS.md](PROGRESS.md) for what was actually verified and [MOVIE_DNA.md]
 ## Decisions for this review
 
 1. Confirm that invite-beta rollout can start after Phases 4 and 5 instead of waiting for the later numbered phases.
-2. Confirm the `monostyle` workspace layout and approve the behaviour-preserving migration as the first Phase 4 checkpoint, before staging, accounts and sync. Approve hosting spend and live provider usage separately.
+2. Review the in-place workspace migration results before deciding whether to start hosted staging. Approve hosting spend and live provider usage separately.
 3. If this draft becomes the roadmap, replace the duplicate phase list in [PRODUCT_SPEC.md](PRODUCT_SPEC.md) with a pointer to the canonical roadmap. Keep [PROGRESS.md](PROGRESS.md) as the record of evidence, not a second plan.
 
 Related: [Provider setup and limits](DATA_PROVIDERS.md) · [Product specification](PRODUCT_SPEC.md) · [Contribution guide](../CONTRIBUTING.md).

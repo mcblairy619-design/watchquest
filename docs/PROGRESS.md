@@ -1,5 +1,11 @@
 # Progress and asset audit
 
+## Monorepo migration — in-place workspace layout
+
+- Moved the React frontend to `apps/web/` and the standalone catalogue API to `apps/api/`, using one npm lockfile in the existing WatchQuest repository. The default web origin, guest mode, storage keys and request-budget ledger are unchanged. The root Vite adapter retains the original one-command local workflow.
+- In a clean Linux copy, `npm ci`, lint, type checks, the production build and all 40 tests passed with no skips. Chromium exercised the built web workspace against the standalone API through the local proxy, and the API workspace startup command returned HTTP 200 in demo mode. No live providers were called. Hosted Windows/Ubuntu CI and separate staging origins are not verified here.
+- `23af228` is the pre-restructure rollback point. Staging and Supabase work were not started.
+
 ## Monorepo migration — local web/API connection
 
 - The Vite dev server and production preview can now forward catalogue requests to the standalone API. The default one-process dev workflow and the local frontend origin are unchanged.

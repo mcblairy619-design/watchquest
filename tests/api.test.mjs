@@ -5,7 +5,7 @@ import process from "node:process";
 import { createInterface } from "node:readline";
 import { test } from "node:test";
 import { fileURLToPath, URL } from "node:url";
-import { createApiServer } from "../server/http.mjs";
+import { createApiServer } from "../apps/api/http.mjs";
 
 async function startApi(t) {
   const server = createApiServer({}); // No provider credentials, regardless of local settings.
@@ -47,7 +47,7 @@ test("standalone API returns JSON 404 instead of serving the frontend", async (t
 });
 
 test("a blank API host keeps the CLI listener on loopback", { timeout: 5000 }, async (t) => {
-  const entry = fileURLToPath(new URL("../server/start.mjs", import.meta.url));
+  const entry = fileURLToPath(new URL("../apps/api/start.mjs", import.meta.url));
   const child = spawn(process.execPath, [entry], {
     env: { WATCHQUEST_API_HOST: "", WATCHQUEST_API_PORT: "0" },
     stdio: ["ignore", "pipe", "inherit"],
