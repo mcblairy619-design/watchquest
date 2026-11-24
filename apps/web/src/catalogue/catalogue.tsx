@@ -12,6 +12,7 @@ export type Title = {
   demo?: boolean;
   art?: string;
   poster?: string;
+  publicRating?: { value: number; source: string };
   source?: "movie-of-the-night";
   availability?: CheckedAvailability & { country: string };
 };

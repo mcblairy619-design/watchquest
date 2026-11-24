@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { once } from "node:events";
 import process from "node:process";
 import { createInterface } from "node:readline";
@@ -63,4 +66,57 @@ test("a blank API host keeps the CLI listener on loopback", { timeout: 5000 }, a
     return;
   }
   assert.fail("API exited before announcing its listener");
+});
+
+test("standalone HTTP forwards eligible fixtures through the shared persistent budget", async (t) => {
+  const folder = await mkdtemp(join(tmpdir(), "watchquest-api-"));
+  const env = {
+    AVAILABILITY_FREE_PLAN: "yes",
+    AVAILABILITY_TERMS_ACCEPTED: "yes",
+    AVAILABILITY_FREE_REQUEST_LIMIT: "1",
+    AVAILABILITY_API_TOKEN: "fixture-key",
+  };
+  let upstreamCalls = 0;
+  const server = createApiServer(
+    env,
+    join(folder, "usage.json"),
+    async (url) => {
+      upstreamCalls++;
+      assert.match(url, /country=gb/);
+      return globalThis.Response.json({
+        shows: [
+          {
+            id: "fixture",
+            title: "Fixture film",
+            showType: "movie",
+            streamingOptions: {
+              gb: [
+                {
+                  type: "subscription",
+                  service: { id: "netflix", name: "Netflix" },
+                },
+              ],
+            },
+          },
+        ],
+      });
+    },
+  );
+  t.after(async () => {
+    await new Promise((resolve) => server.close(resolve));
+    await rm(folder, { recursive: true, force: true });
+  });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const url = `http://127.0.0.1:${server.address().port}/api/catalogue?country=gb&services=netflix`;
+  const catalogue = await globalThis.fetch(url);
+  assert.equal(catalogue.status, 200);
+  assert.deepEqual(
+    (await catalogue.json()).titles.map(({ name }) => name),
+    ["Fixture film"],
+  );
+  const blocked = await globalThis.fetch(url);
+  assert.equal(blocked.status, 429);
+  assert.equal((await blocked.json()).code, "local_quota");
+  assert.equal(upstreamCalls, 1);
 });

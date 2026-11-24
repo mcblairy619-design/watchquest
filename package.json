@@ -11,9 +11,9 @@
     "preview": "vite preview --host 127.0.0.1",
     "check": "npm run check --workspace @watchquest/web",
     "lint": "eslint .",
-    "test": "node --test \"tests/**/*.test.mjs\"",
-    "test:unit": "node --test tests/api.test.mjs tests/catalogue.test.mjs tests/movie-dna.test.mjs",
-    "test:browser": "node --test \"tests/browser/*.test.mjs\"",
+    "test": "node --test --test-concurrency=2 \"tests/**/*.test.mjs\"",
+    "test:unit": "node --test tests/api.test.mjs tests/catalogue.test.mjs tests/movie-dna.test.mjs tests/discovery.test.mjs",
+    "test:browser": "node --test --test-concurrency=2 \"tests/browser/*.test.mjs\"",
     "test:setup": "playwright-core install chromium --only-shell"
   },
   "devDependencies": {

@@ -1083,3 +1083,97 @@ dialog > button {
     scroll-behavior: auto !important;
   }
 }
+
+.discovery-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 145px), 1fr));
+  gap: 12px;
+  margin-block: 12px;
+}
+.discovery-controls label {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  min-width: 0;
+}
+.discovery-controls input:not([type="checkbox"]),
+.discovery-controls select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid #47667d;
+  border-radius: 8px;
+  padding: 7px 9px;
+  background: #0c1926;
+  color: #e4edf7;
+  font: inherit;
+}
+.discovery-controls .check-choice,
+.check-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+.wheel-options {
+  min-width: 0;
+  margin-block: 10px;
+  border: 1px solid #47667d;
+  border-radius: 10px;
+}
+.selection-list {
+  max-height: 19rem;
+  overflow: auto;
+  padding: 0 6px;
+  list-style: none;
+}
+.selection-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 6px 0;
+}
+.viewing-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 24px;
+}
+.viewing-stats dd {
+  margin-inline-start: 0;
+  font-weight: 700;
+}
+
+.catalogue-loading {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.catalogue-loading::before {
+  content: "";
+  width: 1em;
+  height: 1em;
+  border: 2px solid #47667d;
+  border-top-color: #59b4ff;
+  border-radius: 50%;
+  animation: catalogue-turn 750ms linear infinite;
+}
+@keyframes catalogue-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 780px) {
+  .mobile-nav a {
+    min-height: 44px;
+  }
+}
+dialog summary {
+  cursor: pointer;
+}
+dialog summary:focus-visible {
+  outline: 2px solid #6fbdff;
+  outline-offset: 3px;
+}

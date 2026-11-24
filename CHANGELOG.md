@@ -2,12 +2,23 @@
 
 ## Unreleased
 
+- Adopted Roadmap V2 and documented zero-spend private staging options.
+- Preserved the local discovery checkpoint in the web workspace and loaded root environment files for standalone API startup.
+
 - Restructured the WatchQuest repository in place as an npm workspace with `apps/web` and `apps/api`, preserving the one-command local workflow and browser data.
 - Added a standalone Node catalogue API entry point. The existing local development workflow is unchanged.
 - Added an opt-in local proxy so the Vite dev server and production preview can use the standalone API without changing frontend catalogue URLs.
 - Grouped project documentation and frontend feature files. No changes to app behaviour or stored data.
 - Standardised Node and line endings for Windows and Linux, and added a two-OS CI workflow with portable browser tests.
 - Split the browser suite into independent feature scenarios, with shared test setup and synthetic provider fixtures.
+
+## Phase 4 · Ultimate Discovery Experience
+
+- Added combined discovery filters, local sorting and debounced provider search.
+- Improved weekly variety and added recommendation details while keeping existing weekly records and one-slot replacements.
+- Added personalised dice modes and session history, plus a fair film wheel with weekly, watchlist and manual entries.
+- Added watchlist search, priority and undo, local viewing statistics, editable ratings and deduplicated activity events.
+- Kept verified regional subscription checks, the free-plan cap and approved artwork settings.
 
 ## Live catalogue reliability
 

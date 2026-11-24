@@ -19,9 +19,26 @@ browserTest(
     await page.getByRole("button", { name: "Save Last Orbit" }).click();
     await desktopNav.getByRole("link", { name: "My Watchlist" }).click();
     await page.reload();
+    await page.getByLabel("Saved title type").selectOption("Series");
+    await page.getByText("No saved titles match these filters.").waitFor();
+    await page.getByLabel("Saved title type").selectOption("Film");
+    await page.getByLabel("Search watchlist").fill("Last Orbit");
+    const priority = page.getByRole("button", { name: "Viewing priority" });
+    await priority.click();
+    assert.equal(await priority.getAttribute("aria-pressed"), "true");
+    await page
+      .getByRole("button", { name: "Remove Last Orbit from watchlist" })
+      .click();
+    await page.getByRole("button", { name: "Undo removal" }).click();
     await page.getByRole("button", { name: "View Last Orbit" }).click();
     await page.getByRole("button", { name: "Mark as watched" }).click();
     await page.keyboard.press("Escape");
+    await desktopNav.getByRole("link", { name: "Profile" }).click();
+    const films = page
+      .locator(".viewing-stats div")
+      .filter({ hasText: "Films watched" })
+      .locator("dd");
+    await films.getByText("1").waitFor();
     await desktopNav.getByRole("link", { name: "Achievements" }).click();
     for (const name of ["First Save", "First Film"]) {
       await page

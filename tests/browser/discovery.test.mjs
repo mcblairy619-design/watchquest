@@ -13,7 +13,12 @@ browserTest("demo search filters the catalogue", async ({ newPage, url }) => {
   await page.goto(url);
   await page.getByRole("searchbox").fill("Neon");
   await page.getByRole("heading", { name: "Discover" }).waitFor();
+  await page.locator(".card").waitFor();
   assert.equal(await page.locator(".card").count(), 1);
+  await page.getByLabel("Title type", { exact: true }).selectOption("Series");
+  await page.getByRole("heading", { name: "No titles found" }).waitFor();
+  await page.getByRole("button", { name: "Reset filters" }).click();
+  await page.locator(".card").waitFor();
 });
 
 browserTest(
@@ -26,14 +31,25 @@ browserTest(
       .getByRole("navigation", { name: "Main navigation" })
       .getByRole("link", { name: "Discover" })
       .click();
-    await page.getByRole("heading", { name: "Discover", exact: true }).waitFor();
-    await page.getByRole("button", { name: "Roll the Dice", exact: true }).click();
+    await page
+      .getByRole("heading", { name: "Discover", exact: true })
+      .waitFor();
+    await page
+      .getByRole("button", { name: "Roll the Dice", exact: true })
+      .click();
     const dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Roll style").selectOption("best");
     await dialog.getByRole("button", { name: "Roll the Dice" }).click();
     const pick = await dialog.getByRole("heading", { level: 3 }).textContent();
     assert.notEqual(pick, "Last Orbit");
     await dialog.getByRole("button", { name: "Roll again" }).click();
     assert.notEqual(
+      await dialog.getByRole("heading", { level: 3 }).textContent(),
+      pick,
+    );
+    await dialog.getByText("Roll history (2)", { exact: true }).click();
+    await dialog.getByRole("button", { name: pick, exact: true }).click();
+    assert.equal(
       await dialog.getByRole("heading", { level: 3 }).textContent(),
       pick,
     );
@@ -65,6 +81,17 @@ browserTest(
     const dialog = page.getByRole("dialog");
     await dialog.getByRole("button", { name: "Spin the wheel" }).click();
     await dialog.getByRole("button", { name: "Spin again" }).waitFor();
+    await dialog.getByLabel("Film source").selectOption("manual");
+    await dialog
+      .getByText("No eligible demo titles remain with these options.")
+      .waitFor();
+    await dialog.getByRole("checkbox").first().check();
+    const title = await dialog.locator(".wheel span").textContent();
+    await dialog.getByRole("button", { name: "Spin the wheel" }).click();
+    assert.equal(
+      await dialog.getByRole("heading", { level: 3 }).textContent(),
+      title,
+    );
   },
 );
 

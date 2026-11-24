@@ -16,6 +16,8 @@ TMDB is optional and serves legacy saved-title details when Movie of the Night i
 
 ## Request budget and caching
 
+Phase 4 filters, sorts, rolls and spins act on results already loaded in the current session. Wider title search is debounced and uses the existing guarded catalogue route. Watchlist details use the existing lookup when fresh results are unavailable. No completed-response cache or artwork permission changed in Phase 4.
+
 Movie DNA uses the country service list and on-demand title metadata. The weekly dashboard can request a film or series supplement when the first non-empty verified catalogue page is too short. These requests share the same budget and caching rules. [Movie DNA details](MOVIE_DNA.md)
 
 - The app enforces at most **450 upstream requests per rolling 31 days**, or a lower configured limit. A local ignored ledger survives restarts, and the server reserves a slot before each upstream attempt. The provider account quota is separate. The direct terms say API access pauses at the plan cap without request overage fees. This local ledger covers this checkout only. Keep the provider account on the free plan. [Direct developer terms](https://developers.movieofthenight.com/terms-and-conditions)

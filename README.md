@@ -4,17 +4,19 @@
 
 **FIND • WATCH • RATE • LEVEL UP.**
 
-WatchQuest is a film and television discovery prototype with a browser-local Movie DNA profile and weekly picks. It runs with a fictional catalogue until the owner enables permitted provider access. Phase 4 requires the owner's approval.
+WatchQuest is a film and television discovery prototype with a browser-local Movie DNA profile and weekly picks. It runs with a fictional catalogue until the owner enables permitted provider access. See the roadmap for the next approval gate.
 
 - [Product specification](docs/PRODUCT_SPEC.md)
 - [Development roadmap](docs/ROADMAP.md)
 - [Progress and asset audit](docs/PROGRESS.md)
+- [Phase 4.1 hosting options](docs/HOSTING.md)
 - [Contribution guide](CONTRIBUTING.md)
 - [Development instructions for coding agents](AGENTS.md)
 - [Changelog](CHANGELOG.md)
 - [Environment template](.env.example)
 - [Data provider decisions and local setup](docs/DATA_PROVIDERS.md)
 - [Movie DNA, recommendations and weekly history](docs/MOVIE_DNA.md)
+- [Discovery, activity and limitations](docs/DISCOVERY.md)
 
 ## Run locally
 
@@ -22,14 +24,14 @@ Use the Node.js version in [`.node-version`](.node-version). From the repository
 
 Open **Movie DNA** and choose **Retake questionnaire** to answer the nine steps, or **Edit Movie DNA** to jump to an answer from the review. Saved titles, watch history, ratings and preferences are stored in the browser you use.
 
-Run `npm run start:api` to start the standalone catalogue API, then open [its status endpoint](http://127.0.0.1:3001/api/catalogue/status). It binds to `127.0.0.1:3001` by default; set `WATCHQUEST_API_HOST` or `WATCHQUEST_API_PORT` in the server environment to override this. It does not serve the frontend. By default, `npm run dev` still runs the frontend and its embedded catalogue API on port 5173.
+Run `npm run start:api` to start the standalone catalogue API, then open [its status endpoint](http://127.0.0.1:3001/api/catalogue/status). It binds to `127.0.0.1:3001` by default; set `WATCHQUEST_API_HOST` or `WATCHQUEST_API_PORT` in the server environment to override this. It reads the root `.env` and `.env.local` when started through npm. Shell settings override file values. It does not serve the frontend. By default, `npm run dev` still runs the frontend and its embedded catalogue API on port 5173.
 
 To use two processes locally, leave the standalone API running and set `WATCHQUEST_API_PROXY_TARGET` in the web terminal before starting Vite:
 
 - Linux: `WATCHQUEST_API_PROXY_TARGET=http://127.0.0.1:3001 npm run dev --workspace @watchquest/web`
 - PowerShell: `$env:WATCHQUEST_API_PROXY_TARGET = 'http://127.0.0.1:3001'; npm.cmd run dev --workspace @watchquest/web`
 
-Vite forwards catalogue requests to the standalone API without changing the browser's dev origin, so existing local saves remain visible. To try the built frontend, run `npm run build`, then use `npm run preview` with the same environment setting. Preview can use a different port and therefore a different browser storage origin. This proxy is for local development and preview, not the planned two-origin staging deployment.
+Vite forwards catalogue requests to the standalone API without changing the browser's dev origin, so existing local saves remain visible. To try the built frontend, run `npm run build`, then use `npm run preview` with the same environment setting. Keep using exactly `http://127.0.0.1:5173/` in the same browser profile to retain existing data. If you need to verify the built frontend with those saves, stop the dev server and run `npm run preview -- --port 5173 --strictPort` instead. A different port, hostname (including localhost) or scheme has separate browser storage. Returning to the old origin restores access to its original saves. This proxy is for local development and preview, not the planned two-origin staging deployment.
 
 ## Repository layout
 

@@ -6,7 +6,7 @@ const STREAMING = "https://api.movieofthenight.com/v4";
 const regions = new Set(["gb", "ie", "us", "ca", "au"]);
 const offerTypes = new Set(["subscription", "rent", "buy", "addon", "free"]);
 
-class ProviderError extends Error {
+export class ProviderError extends Error {
   constructor(status, retryAfter, code) {
     super("Catalogue provider request failed");
     this.status = status;
@@ -155,6 +155,13 @@ function titleFrom(item, kind, genres, posters) {
         : undefined,
     releaseDate: kind === "movie" ? item.release_date : item.first_air_date,
     synopsis: item.overview,
+    publicRating:
+      Number.isFinite(item.vote_average) &&
+      item.vote_average >= 0 &&
+      item.vote_average <= 10 &&
+      item.vote_count > 0
+        ? { value: item.vote_average, source: "TMDB" }
+        : undefined,
     poster:
       posters && /^\/[\w-]+\.(jpg|png)$/i.test(item.poster_path ?? "")
         ? "https://image.tmdb.org/t/p/w342" + item.poster_path
@@ -438,42 +445,6 @@ export function createCatalogue(env, fetcher = globalThis.fetch, budgetPath) {
     } catch (error) {
       if (availability && error.status === 404) return { state: "unknown" };
       throw error;
-    }
-  };
-}
-
-export function catalogueMiddleware(env, fetcher, budgetPath) {
-  const run = createCatalogue(env, fetcher, budgetPath);
-  return async (req, res, next) => {
-    const url = new URL(req.url, "http://localhost");
-    if (
-      url.pathname !== "/api/catalogue" &&
-      !url.pathname.startsWith("/api/catalogue/")
-    )
-      return next();
-    res.setHeader("Content-Type", "application/json");
-    res.setHeader("Cache-Control", "no-store");
-    try {
-      if (req.method !== "GET") {
-        res.setHeader("Allow", "GET");
-        throw new ProviderError(405);
-      }
-      res.end(JSON.stringify(await run(url)));
-    } catch (error) {
-      res.statusCode = [400, 404, 405, 429, 503, 504].includes(error.status)
-        ? error.status
-        : 502;
-      if (error.retryAfter)
-        res.setHeader("Retry-After", String(error.retryAfter));
-      res.end(
-        JSON.stringify({
-          code: error instanceof ProviderError ? error.code : undefined,
-          error:
-            res.statusCode === 429
-              ? "The data provider is busy. Try again later."
-              : "Catalogue information could not be loaded.",
-        }),
-      );
     }
   };
 }

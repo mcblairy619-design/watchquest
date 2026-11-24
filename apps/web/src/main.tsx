@@ -30,6 +30,7 @@ import { titles as demoTitles } from "./catalogue/demo";
 import {
   Availability,
   countries,
+  hasFreshOffers,
   includedWith,
   includedServices,
   Poster,
@@ -52,6 +53,7 @@ import {
   replaceWeekly,
   toggleRejection,
   weekStarting,
+  summariseTitle,
 } from "./movie-dna/movie-dna";
 import type {
   Feedback,
@@ -61,6 +63,16 @@ import type {
   WeeklyPick,
   WeeklyRecord,
 } from "./movie-dna/movie-dna";
+import {
+  defaultFilters,
+  discover,
+  recordActivity,
+  roll,
+  viewingStats,
+  wheelResult,
+} from "./discovery/discovery";
+import type { Activity, Filters } from "./discovery/discovery";
+import { Choice, DiscoveryFilters } from "./discovery/discovery-ui";
 import "./style.css";
 
 const pages = [
@@ -165,7 +177,9 @@ function RequestMessage({
   retry: () => void;
 }) {
   return loading ? (
-    <p role="status">Loading catalogue…</p>
+    <p role="status" className="catalogue-loading">
+      Loading catalogue…
+    </p>
   ) : error ? (
     <div className="panel">
       <p role="status">{error}</p>
@@ -181,26 +195,39 @@ function SavedEntry({
   country,
   render,
   remove,
+  known,
+  verified,
+  onResolved,
 }: {
   id: string;
   country: string;
   render: (title: Title) => ReactNode;
   remove: () => void;
+  known?: Title;
+  verified?: Title;
+  onResolved: (title: Title) => void;
 }) {
   const demo = demoTitles.find((title) => title.id === id);
   const request = useCatalogueRequest<{ title: Title }>(
-    demo
+    demo || verified
       ? undefined
       : "/api/catalogue/" +
           encodeURIComponent(id) +
           "?country=" +
           (countries[country] ?? ""),
   );
-  const title = demo ?? request.data?.title;
+  const resolved = request.data?.title;
+  useEffect(() => {
+    if (resolved) onResolved(resolved);
+  }, [resolved, onResolved]);
+  const title = demo ?? verified ?? resolved ?? known;
   if (title) return render(title);
   return (
     <div className="panel">
       <RequestMessage {...request} />
+      {!request.loading && !request.error && (
+        <p>Details for this saved entry are unavailable.</p>
+      )}
       <button className="button secondary" onClick={remove}>
         Remove saved entry
       </button>
@@ -259,14 +286,45 @@ function App() {
     emptyFeedback,
   );
   const [weeks, setWeeks] = useLocal<WeeklyRecord[]>("weekly-picks", []);
+  const [filters, setFilters] = useState<Filters>(defaultFilters);
+  const [resolvedSaved, setResolvedSaved] = useState<Record<string, Title>>({});
+  const rememberSaved = useCallback(
+    (title: Title) =>
+      setResolvedSaved((previous) =>
+        previous[title.id] === title
+          ? previous
+          : { ...previous, [title.id]: title },
+      ),
+    [],
+  );
+  const [savedQuery, setSavedQuery] = useState("");
+  const [savedFilters, setSavedFilters] = useState<Filters>(defaultFilters);
+  const [savedOrder, setSavedOrder] = useState("latest");
+  const [priorities, setPriorities] = useLocal<string[]>(
+    "saved-priorities",
+    [],
+  );
+  const [knownTitles, setKnownTitles] = useLocal<Record<string, TitleSummary>>(
+    "activity-titles",
+    {},
+  );
+  const [events, setEvents] = useLocal<Activity>("activity-events-v1", {});
+  const [undo, setUndo] = useState<{ id: string; index: number }>();
+  const [diceFilters, setDiceFilters] = useState<Filters>(defaultFilters);
+  const [diceMode, setDiceMode] = useState("random");
+  const [rollHistory, setRollHistory] = useState<
+    { title: Title; reason: string }[]
+  >([]);
+  const [wheelSource, setWheelSource] = useState("weekly");
+  const [wheelSelected, setWheelSelected] = useState<string[]>([]);
+  const [wheelHidden, setWheelHidden] = useState<string[]>([]);
   const [replacementMessage, setReplacementMessage] = useState("");
   const [query, setQuery] = useState("");
   const [submitted, setSubmitted] = useState("");
   const [clock, setClock] = useState(Date.now);
-  const [genre, setGenre] = useState("All");
   const [overlay, setOverlay] = useState<Overlay>();
   const [result, setResult] = useState<Title>();
-  const [diceHistory, setDiceHistory] = useState<string[]>([]);
+  const diceHistory = rollHistory.map(({ title }) => title.id);
   const [turn, setTurn] = useState(0);
   const [spinning, setSpinning] = useState(false);
   const spinTimer = useRef<number | undefined>(undefined);
@@ -299,7 +357,9 @@ function App() {
     350,
   );
   const eligibleNow = (title: Title, now: number) =>
-    !live || includedWith(title, region, services, now);
+    title.demo
+      ? status.data?.enabled === false
+      : live && includedWith(title, region, services, now);
   const primaryTitles: readonly Title[] = live
     ? (catalogue.data?.titles ?? []).filter((title) =>
         eligibleNow(title, clock),
@@ -407,15 +467,17 @@ function App() {
     catalogue.loading || filmSupplement.loading || seriesSupplement.loading;
   const weeklyError =
     catalogue.error ?? filmSupplement.error ?? seriesSupplement.error;
-  const browseRequest = searchPath ? searchResults : catalogue;
+  const browseRequest =
+    status.loading || status.error
+      ? status
+      : searchPath
+        ? searchResults
+        : catalogue;
   const browse = searchPath
     ? (searchResults.data?.titles ?? []).filter((title) =>
         eligibleNow(title, clock),
       )
     : primaryTitles;
-  const genres = [
-    ...new Set(browse.flatMap((title) => title.genres ?? [title.genre])),
-  ];
   const firstFilm = watched.some(
     (id) =>
       id.startsWith("tmdb-movie-") ||
@@ -465,7 +527,7 @@ function App() {
   const clearSearch = useCallback(() => {
     setQuery("");
     setSubmitted("");
-    setGenre("All");
+    setFilters(defaultFilters);
   }, []);
   useEffect(() => {
     const navigate = () => {
@@ -488,13 +550,35 @@ function App() {
         : pages.find((item) => item.id === page)?.name + " | WatchQuest";
   }, [page]);
 
-  const toggleSaved = (id: string) =>
+  const event = (kind: string, subject: string) =>
+    setEvents((previous) =>
+      recordActivity(previous, kind, subject, Date.now()),
+    );
+  const toggleSaved = (title: Title) => {
+    const { id } = title;
+    setKnownTitles((previous) => ({
+      ...previous,
+      [id]: summariseTitle(title),
+    }));
     setSaved((previous) =>
       previous.includes(id)
         ? previous.filter((value) => value !== id)
         : [...previous, id],
     );
-  const toggleWatched = ({ id, type }: Title) => {
+  };
+  const toggleWatched = (title: Title) => {
+    const { id, type } = title;
+    const { genre, genres } = title;
+    setKnownTitles((previous) => ({
+      ...previous,
+      [id]: summariseTitle(title),
+    }));
+    if (!watched.includes(id)) {
+      if (type === "Film") event("film-watched", id);
+      for (const item of genres?.length ? genres : [genre]) {
+        if (item !== "Unclassified") event("genre-watched", item);
+      }
+    }
     if (id.startsWith("motn-"))
       setWatchedTypes((previous) => ({ ...previous, [id]: type }));
     setWatched((previous) =>
@@ -503,8 +587,25 @@ function App() {
         : [...previous, id],
     );
   };
-  const rate = (title: TitleSummary, value?: number) =>
+  const rate = (title: TitleSummary, value?: number) => {
+    if (value !== undefined) event("title-rated", title.id);
     setFeedback((previous) => changeRating(previous, title, value));
+  };
+  useEffect(() => {
+    if (
+      weeklyRecord.picks.length !== 6 ||
+      !weeklyRecord.picks.every((pick) => watched.includes(pick.id))
+    )
+      return;
+    setEvents((previous) =>
+      recordActivity(
+        previous,
+        "weekly-completed",
+        weeklyRecord.week + "|" + weeklyRecord.scope,
+        Date.now(),
+      ),
+    );
+  }, [weeklyRecord, watched, setEvents]);
   const reject = (title: TitleSummary) =>
     setFeedback((previous) => toggleRejection(previous, title));
   const replace = (id: string) => {
@@ -543,42 +644,79 @@ function App() {
     setTurn(0);
     setOverlay(value);
   };
-  const spinPool = weekly.filter(
-    (title) => title.type === "Film" && !watched.includes(title.id),
+  const asScored = (title: Title) => ({
+    title,
+    ...assessTitle(title, ranking.taste, feedback, saved),
+    services: includedServices(title, region, services, clock),
+  });
+  const pool = [
+    ...new Map(
+      [
+        ...Object.values(resolvedSaved).filter(
+          (title) =>
+            live &&
+            includedWith(title, region, services, clock) &&
+            !watched.includes(title.id) &&
+            !Object.hasOwn(feedback.rejected, title.id),
+        ),
+        ...activeTitles.values(),
+        ...browse.filter(
+          (title) =>
+            !watched.includes(title.id) &&
+            !Object.hasOwn(feedback.rejected, title.id),
+        ),
+      ].map((title) => [title.id, title]),
+    ).values(),
+  ];
+  const spinPool = (
+    wheelSource === "weekly"
+      ? weekly
+      : pool.filter((title) =>
+          (wheelSource === "saved" ? saved : wheelSelected).includes(title.id),
+        )
+  ).filter(
+    (title) =>
+      title.type === "Film" &&
+      !wheelHidden.includes(title.id) &&
+      eligibleNow(title, clock),
   );
-  const dicePool = titles.filter((title) => activeTitles.has(title.id));
+  const dicePool = discover(pool.map(asScored), diceFilters, watched).map(
+    (item) => item.title,
+  );
   function rollDice() {
-    const current = dicePool.filter((title) => eligibleNow(title, Date.now()));
-    const unrolled = current.filter((title) => !diceHistory.includes(title.id));
-    const pool = unrolled.length
-      ? unrolled
-      : current.filter(
-          (title) => current.length === 1 || title.id !== result?.id,
-        );
-    const next = pool[Math.floor(Math.random() * pool.length)];
+    const next = roll(
+      dicePool.filter((title) => eligibleNow(title, Date.now())).map(asScored),
+      diceHistory,
+      diceMode,
+    );
     if (next) {
       setResult(next);
-      setDiceHistory(unrolled.length ? [...diceHistory, next.id] : [next.id]);
+      const reason =
+        diceMode === "best"
+          ? "Highest Movie DNA match among titles you have not rolled with these options."
+          : diceMode === "different"
+            ? "Fewer overlaps with your favourite genres, with stronger Movie DNA matches preferred on a tie."
+            : "Drawn at random from titles you have not rolled with these options.";
+      setRollHistory((previous) => [...previous, { title: next, reason }]);
     }
   }
   function spinWheel() {
-    if (spinning || !spinPool.length) return;
-    if (spinPool.some((title) => !eligibleNow(title, Date.now()))) {
-      setClock(Date.now());
+    if (spinning || spinPool.some((title) => !eligibleNow(title, Date.now())))
       return;
-    }
-    const index = Math.floor(Math.random() * spinPool.length);
-    const angle = 360 - ((index + 0.5) * 360) / spinPool.length;
-    const next = (Math.floor(turn / 360) + 4) * 360 + angle;
-    setTurn(next);
+    const spin = wheelResult(spinPool, turn);
+    if (!spin) return;
+    setTurn(spin.angle);
     setResult(undefined);
-    if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setResult(spinPool[index]);
+    if (
+      matchMedia("(prefers-reduced-motion: reduce)").matches ||
+      spinPool.length === 1
+    ) {
+      setResult(spin.winner);
       return;
     }
     setSpinning(true);
     spinTimer.current = window.setTimeout(() => {
-      setResult(spinPool[index]);
+      setResult(eligibleNow(spin.winner, Date.now()) ? spin.winner : undefined);
       setSpinning(false);
     }, 950);
   }
@@ -592,17 +730,75 @@ function App() {
       <span>{label}</span>
     </a>
   );
-  const filtered = browse.filter(
-    (title) =>
-      (genre === "All" || (title.genres ?? [title.genre]).includes(genre)) &&
-      (live ||
-        (title.name + " " + title.genre + " " + title.type)
-          .toLowerCase()
-          .includes(query.trim().toLowerCase())),
-  );
+  const filtered = discover(
+    browse
+      .filter(
+        (title) =>
+          live ||
+          (title.name + " " + title.genre + " " + title.type)
+            .toLowerCase()
+            .includes(query.trim().toLowerCase()),
+      )
+      .map(asScored),
+    filters,
+    watched,
+  ).map((item) => item.title);
   const activityTitles = new Map(
-    [...demoTitles, ...titles].map((title) => [title.id, title]),
+    [
+      ...Object.values(feedback.ratings).map(({ title }) => title),
+      ...Object.values(knownTitles),
+      ...demoTitles,
+      ...Object.values(resolvedSaved),
+      ...titles,
+    ].map((title) => [title.id, title]),
   );
+  const stats = viewingStats(
+    watched,
+    watchedTypes,
+    activityTitles,
+    Object.values(feedback.ratings),
+  );
+  const savedIds = [...saved].sort((a, b) => {
+    if (savedOrder === "priority")
+      return (
+        Number(priorities.includes(b)) - Number(priorities.includes(a)) ||
+        saved.indexOf(b) - saved.indexOf(a)
+      );
+    if (savedOrder === "oldest") return saved.indexOf(a) - saved.indexOf(b);
+    if (savedOrder === "match") {
+      const score = (id: string) => {
+        const title = activityTitles.get(id);
+        return title ? asScored(title).score : -Infinity;
+      };
+      return score(b) - score(a);
+    }
+    return saved.indexOf(b) - saved.indexOf(a);
+  });
+  const savedMatches = (title: Title) =>
+    title.name.toLowerCase().includes(savedQuery.trim().toLowerCase()) &&
+    discover([asScored(title)], savedFilters, watched).length > 0;
+  const filteringSaved = !!(
+    savedQuery.trim() ||
+    savedFilters.type ||
+    savedFilters.service
+  );
+  const removeSaved = (id: string) => {
+    setUndo({ id, index: saved.indexOf(id) });
+    setSaved((previous) => previous.filter((item) => item !== id));
+  };
+  const restoreSaved = () => {
+    if (!undo) return;
+    setSaved((previous) =>
+      previous.includes(undo.id)
+        ? previous
+        : [
+            ...previous.slice(0, undo.index),
+            undo.id,
+            ...previous.slice(undo.index),
+          ],
+    );
+    setUndo(undefined);
+  };
   const recent = watched
     .slice(-3)
     .reverse()
@@ -630,13 +826,31 @@ function App() {
               .join(" · ")}
           </p>
           <p>{title.genres?.join(", ") || title.genre}</p>
+          {title.publicRating && (
+            <p>
+              Public rating: {title.publicRating.value}/10 (
+              {title.publicRating.source})
+            </p>
+          )}
           {live &&
-            pick &&
+            (pick || page === "discover" || page === "watchlist") &&
             includedServices(title, region, services, clock).map((service) => (
               <p key={service} className="card-offer">
                 Included with {service}
               </p>
             ))}
+          {page === "watchlist" &&
+            !includedWith(title, region, services, clock) && (
+              <p>
+                {hasFreshOffers(title, region, clock)
+                  ? "No verified offer with your selected subscriptions"
+                  : "Availability not recently verified"}
+              </p>
+            )}
+          {Object.hasOwn(feedback.rejected, title.id) && <p>Not interested</p>}
+          {feedback.ratings[title.id] && (
+            <p>Your rating: {feedback.ratings[title.id].value}/10</p>
+          )}
           {pick && (
             <div className="pick-explanation">
               {predictions.get(title.id) !== undefined && (
@@ -666,11 +880,13 @@ function App() {
                 : "Save " + title.name
             }
             aria-pressed={saved.includes(title.id)}
-            onClick={() => toggleSaved(title.id)}
+            onClick={() =>
+              page === "watchlist" ? removeSaved(title.id) : toggleSaved(title)
+            }
           >
             <Bookmark size={17} />
           </button>
-          {pick && (
+          {(pick || page === "discover" || page === "watchlist") && (
             <button
               className="icon-button"
               aria-pressed={watched.includes(title.id)}
@@ -688,6 +904,21 @@ function App() {
             </button>
           )}
         </div>
+        {page === "watchlist" && (
+          <button
+            className="text-button"
+            aria-pressed={priorities.includes(title.id)}
+            onClick={() =>
+              setPriorities((previous) =>
+                previous.includes(title.id)
+                  ? previous.filter((id) => id !== title.id)
+                  : [...previous, title.id],
+              )
+            }
+          >
+            Viewing priority
+          </button>
+        )}
         {pick && (
           <div className="pick-actions">
             <button
@@ -744,8 +975,7 @@ function App() {
             role="search"
             onSubmit={(event) => {
               event.preventDefault();
-              setSubmitted(query.trim());
-              setGenre("All");
+              setSubmitted(query.trim().length >= 2 ? query.trim() : "");
               location.hash = "discover";
             }}
           >
@@ -763,9 +993,12 @@ function App() {
               maxLength={100}
               onChange={(event) => {
                 setQuery(event.target.value);
-                setGenre("All");
-                if (!event.target.value.trim()) setSubmitted("");
-                if (!live && page !== "discover") location.hash = "discover";
+                setSubmitted(
+                  event.target.value.trim().length >= 2
+                    ? event.target.value.trim()
+                    : "",
+                );
+                if (page !== "discover") location.hash = "discover";
               }}
             />
             {live && (
@@ -1038,18 +1271,28 @@ function App() {
                   ? "Browse titles included with your selected subscriptions."
                   : "Browse fictional films and series. Streaming availability is unverified."}
               </p>
-              <div className="chips">
-                {["All", ...genres].map((item) => (
-                  <button
-                    className="chip"
-                    key={item}
-                    aria-pressed={genre === item}
-                    onClick={() => setGenre(item)}
-                  >
-                    {item}
-                  </button>
-                ))}
-              </div>
+              <p>
+                {searchPath
+                  ? "Searching the wider provider catalogue within your subscriptions."
+                  : "Filters apply to the currently loaded catalogue. Use search to look beyond it."}
+              </p>
+              <DiscoveryFilters
+                items={browse.map(asScored)}
+                filters={filters}
+                change={setFilters}
+              />
+              <button
+                className="text-button"
+                onClick={() => setFilters(defaultFilters)}
+              >
+                Reset filters
+              </button>
+              {filters.sort === "public" &&
+                !browse.some((title) => title.publicRating) && (
+                  <p>
+                    No sourced public ratings are available in these results.
+                  </p>
+                )}
               <RequestMessage {...browseRequest} />
               {browseRequest.loading ||
               browseRequest.error ? null : filtered.length ? (
@@ -1065,7 +1308,7 @@ function App() {
                       Set viewing country and subscriptions
                     </button>
                   ) : (
-                    <p>Try a different search or genre.</p>
+                    <p>Try another title or reset the catalogue filters.</p>
                   )}
                   <button className="button secondary" onClick={clearSearch}>
                     Clear filters
@@ -1094,15 +1337,91 @@ function App() {
               <p className="intro">
                 Your saved titles are stored in this browser.
               </p>
+              <div className="discovery-controls">
+                <label>
+                  Search watchlist
+                  <input
+                    value={savedQuery}
+                    onChange={(e) => setSavedQuery(e.target.value)}
+                  />
+                </label>
+                <Choice
+                  label="Saved title type"
+                  value={savedFilters.type}
+                  options={[
+                    ["", "All"],
+                    ["Film", "Films"],
+                    ["Series", "Series"],
+                  ]}
+                  onChange={(type) =>
+                    setSavedFilters({ ...savedFilters, type })
+                  }
+                />
+                <Choice
+                  label="Saved verified service"
+                  value={savedFilters.service}
+                  options={[
+                    ["", "Any"],
+                    ...[
+                      ...new Set(
+                        savedIds.flatMap((id) => {
+                          const t = activityTitles.get(id);
+                          return t ? asScored(t).services : [];
+                        }),
+                      ),
+                    ].map((name) => [name, name] as const),
+                  ]}
+                  onChange={(service) =>
+                    setSavedFilters({ ...savedFilters, service })
+                  }
+                />
+                <Choice
+                  label="Sort watchlist"
+                  value={savedOrder}
+                  options={[
+                    ["latest", "Recently saved"],
+                    ["oldest", "Earliest saved"],
+                    ["priority", "Viewing priority"],
+                    ["match", "Best personal match"],
+                  ]}
+                  onChange={setSavedOrder}
+                />
+              </div>
+              {undo && (
+                <div role="status">
+                  Removed from watchlist.{" "}
+                  <button className="button secondary" onClick={restoreSaved}>
+                    Undo removal
+                  </button>
+                </div>
+              )}
+              {saved.length > 0 &&
+                filteringSaved &&
+                savedIds.every(
+                  (id) =>
+                    activityTitles.has(id) &&
+                    !savedMatches(activityTitles.get(id)!),
+                ) && <p role="status">No saved titles match these filters.</p>}
               {saved.length ? (
                 <div className="cards">
-                  {saved.map((id) => (
+                  {savedIds.map((id) => (
                     <SavedEntry
                       key={id}
                       id={id}
                       country={profile.country}
-                      render={card}
-                      remove={() => toggleSaved(id)}
+                      known={activityTitles.get(id)}
+                      verified={
+                        titles.find((title) => title.id === id) ??
+                        (resolvedSaved[id] &&
+                        hasFreshOffers(resolvedSaved[id], region, clock)
+                          ? resolvedSaved[id]
+                          : undefined)
+                      }
+                      onResolved={rememberSaved}
+                      render={(title) =>
+                        savedMatches(title) ? card(title) : null
+                      }
+                      remove={() => removeSaved(id)}
                     />
                   ))}
                 </div>
@@ -1110,9 +1429,7 @@ function App() {
                 <div className="panel">
                   <Bookmark />
                   <h2>Your watchlist is empty</h2>
-                  <p>
-                    Use the bookmark button on any demo title to save it here.
-                  </p>
+                  <p>Use the bookmark button on a title to save it here.</p>
                   <a
                     href="#discover"
                     className="button primary"
@@ -1186,19 +1503,105 @@ function App() {
                   </a>
                 </p>
               </div>
+              <section className="panel">
+                <h2>Viewing statistics</h2>
+                <dl className="viewing-stats">
+                  <div>
+                    <dt>Films watched</dt>
+                    <dd>{stats.films}</dd>
+                  </div>
+                  <div>
+                    <dt>Series marked watched</dt>
+                    <dd>{stats.series}</dd>
+                  </div>
+                  <div>
+                    <dt>Titles rated</dt>
+                    <dd>{Object.keys(feedback.ratings).length}</dd>
+                  </div>
+                  <div>
+                    <dt>Average personal rating</dt>
+                    <dd>
+                      {stats.average === undefined
+                        ? "No ratings yet"
+                        : stats.average.toFixed(1) + "/10"}
+                    </dd>
+                  </div>
+                </dl>
+                {stats.unknown > 0 && (
+                  <p>
+                    {stats.unknown} watched{" "}
+                    {stats.unknown === 1 ? "title has" : "titles have"} no
+                    stored type.
+                  </p>
+                )}
+                <h3>Most watched genres</h3>
+                {stats.genres.length ? (
+                  <ul>
+                    {stats.genres.slice(0, 5).map(([genre, count]) => (
+                      <li key={genre}>
+                        {genre} ({count})
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>No watched titles with genre information yet.</p>
+                )}
+                <h3>Recent viewing activity</h3>
+                {recent.length ? (
+                  <ul>
+                    {recent.map((title) => (
+                      <li key={title.id}>
+                        <button
+                          className="text-button"
+                          onClick={() => open(title)}
+                        >
+                          {title.name}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>No recent titles with saved details.</p>
+                )}
+              </section>
+              <section className="panel">
+                <h2>Personal ratings</h2>
+                {Object.keys(feedback.ratings).length ? (
+                  <ul className="selection-list">
+                    {Object.values(feedback.ratings)
+                      .sort((a, b) => b.value - a.value)
+                      .map(({ title }) => (
+                        <li key={title.id}>
+                          <strong>{title.name}</strong>
+                          <RatingInput
+                            title={title}
+                            feedback={feedback}
+                            onRate={rate}
+                          />
+                        </li>
+                      ))}
+                  </ul>
+                ) : (
+                  <p>
+                    Rate a title to see it here. Your highest ratings appear
+                    first.
+                  </p>
+                )}
+              </section>
             </>
           )}
           {page === "achievements" && (
             <>
               <h1>Achievements</h1>
               <p className="intro">
-                Preview progress with activity from this browser.
+                Preview progress with activity from this browser.{" "}
+                {Object.keys(events).length} recorded actions.
               </p>
               <div className="feature-grid">
                 {[
                   {
                     name: "First Save",
-                    desc: "Save a demo title.",
+                    desc: "Save a title to your watchlist.",
                     done: saved.length > 0,
                   },
                   {
@@ -1287,6 +1690,7 @@ function App() {
             close={close}
             save={(value, updatedFeedback) => {
               setProfile(value);
+              event("movie-dna-completed", "profile");
               setFeedback(updatedFeedback);
               close();
               location.hash = "movie-dna";
@@ -1334,6 +1738,131 @@ function App() {
               : "Every unwatched film in this week’s list has an equal chance."}
           </p>
           {overlay === "dice" && (
+            <>
+              <div className="discovery-controls">
+                <Choice
+                  label="Roll style"
+                  value={diceMode}
+                  onChange={setDiceMode}
+                  options={[
+                    ["random", "Surprise me"],
+                    ["best", "Best match for my Movie DNA"],
+                    ["different", "Something different"],
+                  ]}
+                />
+              </div>
+              <DiscoveryFilters
+                compact
+                items={pool.map(asScored)}
+                filters={diceFilters}
+                change={setDiceFilters}
+              />
+              {rollHistory.length > 0 && (
+                <details>
+                  <summary>Roll history ({rollHistory.length})</summary>
+                  <ul className="selection-list">
+                    {[...rollHistory].reverse().map(({ title }) => (
+                      <li key={title.id}>
+                        <button
+                          className="text-button"
+                          onClick={() => setResult(title)}
+                        >
+                          {title.name}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+            </>
+          )}
+          {overlay === "spin" && (
+            <fieldset disabled={spinning} className="wheel-options">
+              <legend>Wheel entries</legend>
+              <div className="discovery-controls">
+                <Choice
+                  label="Film source"
+                  value={wheelSource}
+                  onChange={(source) => {
+                    setWheelSource(source);
+                    setWheelHidden([]);
+                    setResult(undefined);
+                    setTurn(0);
+                  }}
+                  options={[
+                    ["weekly", "This week's films"],
+                    ["saved", "Saved films"],
+                    ["manual", "Choose films"],
+                  ]}
+                />
+              </div>
+              {wheelSource === "manual" && (
+                <details open>
+                  <summary>Select eligible films</summary>
+                  <ul className="selection-list">
+                    {pool
+                      .filter((title) => title.type === "Film")
+                      .map((title) => (
+                        <li key={title.id}>
+                          <label className="check-choice">
+                            <input
+                              type="checkbox"
+                              checked={wheelSelected.includes(title.id)}
+                              onChange={() => {
+                                setWheelSelected((previous) =>
+                                  previous.includes(title.id)
+                                    ? previous.filter((id) => id !== title.id)
+                                    : [...previous, title.id],
+                                );
+                                setWheelHidden((previous) =>
+                                  previous.filter((id) => id !== title.id),
+                                );
+                                setResult(undefined);
+                                setTurn(0);
+                              }}
+                            />
+                            {title.name}
+                          </label>
+                        </li>
+                      ))}
+                  </ul>
+                </details>
+              )}
+              {spinPool.length > 0 && (
+                <ul className="selection-list">
+                  {spinPool.map((title) => (
+                    <li key={title.id}>
+                      <span>{title.name}</span>
+                      <button
+                        className="text-button"
+                        onClick={() => {
+                          setWheelHidden((previous) => [...previous, title.id]);
+                          setResult(undefined);
+                          setTurn(0);
+                        }}
+                        aria-label={"Remove " + title.name + " from wheel"}
+                      >
+                        Remove
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {wheelHidden.length > 0 && (
+                <button
+                  className="text-button"
+                  onClick={() => {
+                    setWheelHidden([]);
+                    setResult(undefined);
+                    setTurn(0);
+                  }}
+                >
+                  Restore removed entries
+                </button>
+              )}
+            </fieldset>
+          )}
+          {overlay === "dice" && (
             <div
               className="dice-preview"
               key={result?.id ?? "ready"}
@@ -1361,7 +1890,7 @@ function App() {
                             "#176dc8",
                             "#142644",
                             "#244889",
-                          ][i] +
+                          ][i % 5] +
                           " " +
                           (i * 100) / spinPool.length +
                           "% " +
@@ -1398,9 +1927,19 @@ function App() {
                     {[result.genre, result.time].filter(Boolean).join(" · ")}
                   </p>
                   <p>
-                    {live
-                      ? "View details to check streaming options."
+                    {includedServices(result, region, services, clock).length
+                      ? "Included with " +
+                        includedServices(result, region, services, clock).join(
+                          ", ",
+                        )
                       : "Streaming availability unverified."}
+                  </p>
+                  <p>
+                    {overlay === "spin"
+                      ? "Selected at random from the wheel."
+                      : rollHistory.find(({ title }) => title.id === result.id)
+                          ?.reason}{" "}
+                    {asScored(result).reasons.join(" ")}
                   </p>
                   <button
                     className="button secondary"
@@ -1412,13 +1951,22 @@ function App() {
               </div>
             )}
           </div>
-          <RequestMessage {...catalogue} />
-          {catalogue.loading || catalogue.error ? null : !(overlay === "dice"
-              ? dicePool.length
+          <RequestMessage
+            {...(status.loading || status.error ? status : catalogue)}
+          />
+          {status.loading ||
+          status.error ||
+          catalogue.loading ||
+          catalogue.error ? null : !(overlay === "dice"
+              ? dicePool.some(
+                  (title) =>
+                    !diceHistory.includes(title.id) &&
+                    eligibleNow(title, clock),
+                )
               : spinPool.length) ? (
             <p>
-              No unwatched {live ? "catalogue" : "demo"} titles remain for this
-              activity.
+              No eligible {live ? "catalogue" : "demo"} titles remain with these
+              options. {overlay === "dice" && "Try changing your roll options."}
             </p>
           ) : (
             <button
@@ -1446,6 +1994,30 @@ function App() {
             title={overlay}
             country={profile.country}
           />
+          {weeklyRecord.picks.some((pick) => pick.id === overlay.id) && (
+            <section className="pick-explanation">
+              <h3>Why this weekly pick?</h3>
+              <p>
+                {weeklyRecord.picks
+                  .find((pick) => pick.id === overlay.id)
+                  ?.reasons.join(" ") ||
+                  (live
+                    ? "Selected to add variety within your eligible catalogue."
+                    : "Selected from the fictional demo catalogue.")}
+              </p>
+            </section>
+          )}
+          {asScored(overlay).prediction !== undefined && (
+            <p>
+              Personal prediction: {asScored(overlay).prediction?.toFixed(1)}/10
+            </p>
+          )}
+          {overlay.publicRating && (
+            <p>
+              Public rating: {overlay.publicRating.value.toFixed(1)}/10 (
+              {overlay.publicRating.source})
+            </p>
+          )}
           <div className="title-feedback">
             <RatingInput title={overlay} feedback={feedback} onRate={rate} />
             <button
@@ -1462,7 +2034,11 @@ function App() {
             <button
               className="button primary"
               aria-pressed={saved.includes(overlay.id)}
-              onClick={() => toggleSaved(overlay.id)}
+              onClick={() =>
+                page === "watchlist" && saved.includes(overlay.id)
+                  ? removeSaved(overlay.id)
+                  : toggleSaved(overlay)
+              }
             >
               <Bookmark size={17} />
               {saved.includes(overlay.id)

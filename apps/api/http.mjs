@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import { catalogueMiddleware } from "./catalogue.mjs";
+import { catalogueMiddleware } from "./catalogue-http.mjs";
 
 function sendError(response, status, error) {
   response.writeHead(status, {
@@ -9,8 +9,8 @@ function sendError(response, status, error) {
   response.end(JSON.stringify({ error }));
 }
 
-export function createApiServer(env, budgetPath) {
-  const catalogue = catalogueMiddleware(env, undefined, budgetPath);
+export function createApiServer(env, budgetPath, fetcher) {
+  const catalogue = catalogueMiddleware(env, fetcher, budgetPath);
   return createServer((request, response) => {
     catalogue(request, response, () => sendError(response, 404, "Not found."))
       .catch((error) => {

@@ -1,5 +1,14 @@
 # Progress and asset audit
 
+## Phase 4.0 — Roadmap V2 and verified workspace migration
+
+- Adopted Roadmap V2 in [ROADMAP.md](ROADMAP.md). The owner approved the first invite-only UK beta after Phases 4 and 5 pass, and reviews in a second wave after Phase 6. [HOSTING.md](HOSTING.md) compares zero-spend staging options. No staging resources were created.
+- Reviewed branch tip `69e8409` and preserved the existing workspace migration and shared lockfile. Ported the separate local discovery checkpoint `9516d48` onto the migration branch without altering local main. The old app split can be restored from the pre-restructure revision `23af228`, and `9516d48` remains the earlier standalone discovery rollback point.
+- Retained the catalogue route contract, provider adapters and persistent 450-request rolling 31-day cap. The standalone npm command reads the repository environment files and uses the existing ledger. Both apps run independently and the built web app reaches the Node API over HTTP through the local preview proxy.
+- Verified on Windows with the pinned Node version and a fresh workspace install in a temporary copy. ESLint, TypeScript, production build and all 48 automated tests passed with zero failures or skips. Playwright Chromium covered desktop and phone-sized layouts, including 320 px and reduced motion. The standalone Node command returned HTTP 200 with providers disabled. The HTTP quota test used synthetic data and blocked a second request at the fixture cap. Credential scanning found no matches. Zero requests reached live providers.
+- Regression tests verified Movie DNA, weekly picks and replacements, London rollover and history, search, dice, wheel, watchlist filters and undo, watched history, rating and rejection changes, achievements, guest mode and catalogue recovery. The origin stays at `http://127.0.0.1:5173/` and existing keys and saved IDs stay compatible. The tests used seeded saves and did not access real browser storage.
+- Hosted CI for the migration head was unavailable. A Linux pass was recorded for the earlier workspace checkpoint, before the discovery port. Run Windows and Ubuntu CI on the final candidate before merging. Physical Safari and the hosted two-origin setup remain unverified. Phase 4.1 awaits approval.
+
 ## Monorepo migration — in-place workspace layout
 
 - Moved the React frontend to `apps/web/` and the standalone catalogue API to `apps/api/`, using one npm lockfile in the existing WatchQuest repository. The default web origin, guest mode, storage keys and request-budget ledger are unchanged. The root Vite adapter retains the original one-command local workflow.
@@ -32,6 +41,14 @@
 
 - Grouped catalogue and Movie DNA frontend modules by feature and moved project documentation into `docs/`. Runtime changes are limited to import paths; storage keys and provider handling were not touched.
 - ESLint, TypeScript, the production build, relative Markdown links and 17 automated tests passed on Linux. The five browser tests were skipped because they require executables at fixed Windows paths; mobile browser coverage is not claimed for this checkpoint.
+
+## Phase 4 · Ultimate Discovery Experience
+
+- Started from a clean `main` at `30f0003`. Reviewed Movie DNA, weekly picks, catalogue guards, search, dice and wheel before changing application code.
+- Implemented discovery and weekly improvements, dice and wheel controls, watchlist filters and undo, local viewing statistics, editable ratings and deduplicated activity events. Existing browser storage keys and IDs remain compatible. Details and limitations are in [DISCOVERY.md](DISCOVERY.md).
+- ESLint, TypeScript, the production build and all 29 automated tests passed. Chrome and Edge exercised desktop and emulated phone layouts, including reduced motion and a 320 px viewport check. Regression checks covered previously saved data, weekly stability and reconnection. Physical phone and Safari testing remain open.
+- Phase 4 used demo and mocked responses and consumed zero live requests. The 450-request rolling 31-day budget, existing cache settings and artwork restrictions remain in force. The primary catalogue has no sourced public review score in the current interface. Older watched entries with missing metadata remain stored.
+- The original discovery checkpoint was recorded locally as `9516d48`.
 
 ## Live catalogue reliability · 23 November 2026
 

@@ -4,7 +4,8 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { URL } from "node:url";
-import { catalogueMiddleware, createCatalogue } from "../apps/api/catalogue.mjs";
+import { createCatalogue } from "../apps/api/catalogue.mjs";
+import { catalogueMiddleware } from "../apps/api/catalogue-http.mjs";
 
 const env = {
   AVAILABILITY_TERMS_ACCEPTED: "yes",
@@ -343,4 +344,16 @@ test("completed responses are fetched again when caching is disabled", async (t)
   await run(url);
   await run(url);
   assert.equal(calls, 2);
+});
+
+test("an invalid free-plan limit above 450 cannot enable upstream requests", async (t) => {
+  const run = createCatalogue(
+    { ...env, AVAILABILITY_FREE_REQUEST_LIMIT: "451" },
+    () => assert.fail("A disabled catalogue must make no upstream request"),
+    budget(t),
+  );
+  assert.equal((await run(route("/status"))).enabled, false);
+  assert.deepEqual(await run(route("/motn-fixture/availability?country=gb")), {
+    state: "unconfigured",
+  });
 });
