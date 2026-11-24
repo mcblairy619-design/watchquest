@@ -26,7 +26,7 @@ import "@fontsource/inter/latin-600.css";
 import "@fontsource/inter/latin-700.css";
 import "@fontsource/montserrat/latin-700.css";
 import "@fontsource/montserrat/latin-800.css";
-import { titles as demoTitles } from "./demo";
+import { titles as demoTitles } from "./catalogue/demo";
 import {
   Availability,
   countries,
@@ -34,13 +34,13 @@ import {
   includedServices,
   Poster,
   useCatalogueRequest,
-} from "./catalogue";
-import type { Title } from "./catalogue";
+} from "./catalogue/catalogue";
+import type { Title } from "./catalogue/catalogue";
 import {
   MovieDnaPage,
   MovieDnaQuestionnaire,
   RatingInput,
-} from "./movie-dna-ui";
+} from "./movie-dna/movie-dna-ui";
 import {
   assessTitle,
   changeRating,
@@ -52,7 +52,7 @@ import {
   replaceWeekly,
   toggleRejection,
   weekStarting,
-} from "./movie-dna";
+} from "./movie-dna/movie-dna";
 import type {
   Feedback,
   Profile,
@@ -60,7 +60,7 @@ import type {
   TitleSummary,
   WeeklyPick,
   WeeklyRecord,
-} from "./movie-dna";
+} from "./movie-dna/movie-dna";
 import "./style.css";
 
 const pages = [

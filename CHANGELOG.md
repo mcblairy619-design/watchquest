@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Grouped project documentation and frontend feature files. No changes to app behaviour or stored data.
+
 ## Live catalogue reliability
 
 - Added reconnect recovery and separate messages for failed checks and successful checks with no eligible offers.

@@ -11,7 +11,7 @@ import {
   titleGenres,
   toggleRejection,
   weekStarting,
-} from "../src/movie-dna.ts";
+} from "../src/movie-dna/movie-dna.ts";
 
 function title(id, genres = ["Drama"], extra = {}) {
   return {

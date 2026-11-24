@@ -11,7 +11,7 @@ TMDB is optional and serves legacy saved-title details when Movie of the Night i
 ## Enable the direct free plan locally
 
 1. Sign up on the Movie of the Night developer portal. Choose the direct free plan and confirm the quota in your dashboard. The direct free plan can be opened without payment details. [Developer portal](https://developers.movieofthenight.com/) · [Authentication guide](https://docs.movieofthenight.com/guide/authentication)
-2. Copy `.env.example` to `.env.local` if it does not already exist. Put the key in `AVAILABILITY_API_TOKEN` and set `AVAILABILITY_FREE_PLAN=yes` and `AVAILABILITY_TERMS_ACCEPTED=yes` after confirming the plan and terms. Set `AVAILABILITY_FREE_REQUEST_LIMIT=450` if the account quota supports it, or set a smaller positive number within the account quota. Keep the key out of chat, Git and browser code.
+2. In the project root, copy [`.env.example`](../.env.example) to `.env.local` if it does not already exist. Put the key in `AVAILABILITY_API_TOKEN` and set `AVAILABILITY_FREE_PLAN=yes` and `AVAILABILITY_TERMS_ACCEPTED=yes` after confirming the plan and terms. Set `AVAILABILITY_FREE_REQUEST_LIMIT=450` if the account quota supports it, or set a smaller positive number within the account quota. Keep the key out of chat, Git and browser code.
 3. Restart with `npm.cmd run dev`. Open [the local site](http://127.0.0.1:5173/) and look for **Live catalogue**. In Profile, edit viewing preferences and select the country and services you already subscribe to. Enter a title and submit the search or open a weekly pick to see the offers.
 
 ## Request budget and caching

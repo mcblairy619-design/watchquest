@@ -3,8 +3,8 @@ import {
   countries,
   subscriptionServices,
   useCatalogueRequest,
-} from "./catalogue";
-import type { Title } from "./catalogue";
+} from "../catalogue/catalogue";
+import type { Title } from "../catalogue/catalogue";
 import {
   catalogueGenres,
   changeRating,

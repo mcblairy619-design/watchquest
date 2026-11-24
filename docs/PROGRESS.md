@@ -1,5 +1,10 @@
 # Progress and asset audit
 
+## Repository organisation
+
+- Grouped catalogue and Movie DNA frontend modules by feature and moved project documentation into `docs/`. Runtime changes are limited to import paths; storage keys and provider handling were not touched.
+- ESLint, TypeScript, the production build, relative Markdown links and 17 automated tests passed on Linux. The five browser tests were skipped because they require executables at fixed Windows paths; mobile browser coverage is not claimed for this checkpoint.
+
 ## Live catalogue reliability · 23 November 2026
 
 - Confirmed live mode on the normal local server. One budgeted primary catalogue diagnostic returned HTTP 200 and 20 verified UK Netflix titles, taking the ledger from 58 to 59 of 450 requests. Historical provider failures were not recorded, so the initial trigger could not be confirmed.
