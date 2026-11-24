@@ -1,5 +1,11 @@
 # Progress and asset audit
 
+## Monorepo migration — standalone API preparation
+
+- The WatchQuest migration branch can now run the existing catalogue routes in a standalone Node process. `npm run start:api` starts the API; `npm run dev` still uses Vite's existing catalogue integration. No frontend or browser storage changes were made.
+- On Linux, ESLint, TypeScript, the production frontend build and all 39 tests passed with no skips, including a regression check that a blank host setting keeps the API bound to loopback. A separate CLI smoke check returned HTTP 200 from the standalone status endpoint with both providers disabled. No live provider calls or Windows checks were run.
+- The destination workspace is not yet confirmed. Moving the apps into monostyle, connecting the built frontend to the standalone API across origins, and verifying destination CI are still outstanding. This is not the Phase 4.0 completion checkpoint.
+
 ## Browser test organisation
 
 - Replaced the single browser file with six feature suites covering smoke checks, watchlist, discovery, Movie DNA, catalogue and weekly picks. Each scenario uses a fresh browser context, and synthetic provider responses remain test-only. The existing Node suites and runtime are unchanged.

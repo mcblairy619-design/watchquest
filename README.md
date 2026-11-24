@@ -22,12 +22,14 @@ Use the Node.js version in [`.node-version`](.node-version). From the project fo
 
 Open **Movie DNA** and choose **Retake questionnaire** to answer the nine steps, or **Edit Movie DNA** to jump to an answer from the review. Saved titles, watch history, ratings and preferences are stored in the browser you use.
 
+Run `npm run start:api` to start the standalone catalogue API, then open [its status endpoint](http://127.0.0.1:3001/api/catalogue/status). It binds to `127.0.0.1:3001` by default; set `WATCHQUEST_API_HOST` or `WATCHQUEST_API_PORT` in the server environment to override this. It does not serve the frontend. The existing `npm run dev` command still runs the frontend and its embedded catalogue API on port 5173; it does not require the standalone process.
+
 ## Repository layout
 
 - `src/main.tsx` and `src/style.css`: app entry, navigation, shared UI and styles.
 - `src/catalogue/`: catalogue requests, offer display and fictional demo titles.
 - `src/movie-dna/`: questionnaire, feedback, scoring and weekly picks.
-- `server/`: provider integration and the request budget, connected to Vite for local development and preview.
+- `server/`: provider integration and the request budget, available through the standalone Node entry point and still connected to Vite for local development and preview.
 - `tests/`: server catalogue and Movie DNA unit tests; `tests/browser/` contains browser scenarios grouped by feature, with shared setup and test-only fixtures in `support/`.
 - `public/`: assets served as-is, including branding and licence notices.
 - `docs/`: product specification, roadmap, progress and feature notes.
