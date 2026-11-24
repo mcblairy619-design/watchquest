@@ -19,6 +19,7 @@ before(async () => {
     // Never use real provider credentials in the test server.
     process.env.AVAILABILITY_FREE_PLAN = "no";
     process.env.CATALOGUE_USE = "disabled";
+    delete process.env.WATCHQUEST_API_PROXY_TARGET;
     cacheDir = await mkdtemp(join(tmpdir(), "watchquest-browser-"));
     // Let the OS allocate a free port instead of Vite's default port.
     httpServer = createHttpServer();

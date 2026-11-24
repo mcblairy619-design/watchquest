@@ -1,5 +1,11 @@
 # Progress and asset audit
 
+## Monorepo migration — local web/API connection
+
+- The Vite dev server and production preview can now forward catalogue requests to the standalone API. The default one-process dev workflow and the local frontend origin are unchanged.
+- On Linux, lint, type checks, the production build and all 40 tests passed with no skips. A Chromium test loaded a temporary production build and verified that its status request reached the standalone API; a separate dev-proxy check confirmed query strings are preserved. No live provider calls were made.
+- This verifies the local proxy only, not separate staging origins or the destination workspace.
+
 ## Monorepo migration — standalone API preparation
 
 - The WatchQuest migration branch can now run the existing catalogue routes in a standalone Node process. `npm run start:api` starts the API; `npm run dev` still uses Vite's existing catalogue integration. No frontend or browser storage changes were made.

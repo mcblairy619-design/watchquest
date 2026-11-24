@@ -22,7 +22,14 @@ Use the Node.js version in [`.node-version`](.node-version). From the project fo
 
 Open **Movie DNA** and choose **Retake questionnaire** to answer the nine steps, or **Edit Movie DNA** to jump to an answer from the review. Saved titles, watch history, ratings and preferences are stored in the browser you use.
 
-Run `npm run start:api` to start the standalone catalogue API, then open [its status endpoint](http://127.0.0.1:3001/api/catalogue/status). It binds to `127.0.0.1:3001` by default; set `WATCHQUEST_API_HOST` or `WATCHQUEST_API_PORT` in the server environment to override this. It does not serve the frontend. The existing `npm run dev` command still runs the frontend and its embedded catalogue API on port 5173; it does not require the standalone process.
+Run `npm run start:api` to start the standalone catalogue API, then open [its status endpoint](http://127.0.0.1:3001/api/catalogue/status). It binds to `127.0.0.1:3001` by default; set `WATCHQUEST_API_HOST` or `WATCHQUEST_API_PORT` in the server environment to override this. It does not serve the frontend. By default, `npm run dev` still runs the frontend and its embedded catalogue API on port 5173.
+
+To use two processes locally, leave the standalone API running and set `WATCHQUEST_API_PROXY_TARGET` in the web terminal before starting Vite:
+
+- Linux: `WATCHQUEST_API_PROXY_TARGET=http://127.0.0.1:3001 npm run dev`
+- PowerShell: `$env:WATCHQUEST_API_PROXY_TARGET = 'http://127.0.0.1:3001'; npm.cmd run dev`
+
+Vite forwards catalogue requests to the standalone API without changing the browser's dev origin, so existing local saves remain visible. To try the built frontend, run `npm run build`, then use `npm run preview` with the same environment setting. Preview can use a different port and therefore a different browser storage origin. This proxy is for local development and preview, not the planned two-origin staging deployment.
 
 ## Repository layout
 

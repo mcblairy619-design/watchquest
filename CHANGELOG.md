@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Added a standalone Node catalogue API entry point as the first step towards the monostyle migration. The existing local development workflow is unchanged.
+- Added an opt-in local proxy so the Vite dev server and production preview can use the standalone API without changing frontend catalogue URLs.
 - Grouped project documentation and frontend feature files. No changes to app behaviour or stored data.
 - Standardised Node and line endings for Windows and Linux, and added a two-OS CI workflow with portable browser tests.
 - Split the browser suite into independent feature scenarios, with shared test setup and synthetic provider fixtures.
