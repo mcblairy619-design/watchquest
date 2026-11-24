@@ -1,5 +1,10 @@
 # Progress and asset audit
 
+## Browser test organisation
+
+- Replaced the single browser file with six feature suites covering smoke checks, watchlist, discovery, Movie DNA, catalogue and weekly picks. Each scenario uses a fresh browser context, and synthetic provider responses remain test-only. The existing Node suites and runtime are unchanged.
+- On Linux, all 34 tests passed with no skips, including 17 browser scenarios. ESLint, TypeScript and the production build also passed. The existing CI workflow picks up the nested suites through `npm test`; Windows has not been run for this checkpoint.
+
 ## Windows and Linux development
 
 - Pinned the shared Node.js version and standardised text file line endings. The browser suite now uses Playwright-managed headless Chromium and starts a temporary local demo server, with provider responses mocked where needed.

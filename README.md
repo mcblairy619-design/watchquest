@@ -27,12 +27,12 @@ Open **Movie DNA** and choose **Retake questionnaire** to answer the nine steps,
 - `src/catalogue/`: catalogue requests, offer display and fictional demo titles.
 - `src/movie-dna/`: questionnaire, feedback, scoring and weekly picks.
 - `server/`: provider integration and the request budget, connected to Vite for local development and preview.
-- `tests/`: catalogue, Movie DNA and browser regression tests.
+- `tests/`: server catalogue and Movie DNA unit tests; `tests/browser/` contains browser scenarios grouped by feature, with shared setup and test-only fixtures in `support/`.
 - `public/`: assets served as-is, including branding and licence notices.
 - `docs/`: product specification, roadmap, progress and feature notes.
 
 ## Checks
 
-Run `npm run test:setup` once, and again after Playwright updates, to download the matching headless Chromium. On a supported Linux distribution that is missing browser libraries, run `npm run test:setup -- --with-deps`. Then run `npm test` on either OS. Browser tests start their own local demo server with provider access disabled; you don't need to stop your dev server or install Chrome or Edge. Use `npm run test:unit` to run the Node-only tests without Chromium.
+Run `npm run test:setup` once, and again after Playwright updates, to download the matching headless Chromium. On a supported Linux distribution that is missing browser libraries, run `npm run test:setup -- --with-deps`. Then run `npm test` on either OS. Browser tests start their own local demo servers with provider access disabled; you don't need to stop your dev server or install Chrome or Edge. Use `npm run test:browser` for the browser suite alone, or `npm run test:unit` for the Node-only tests without Chromium.
 
 Run `npm run lint`, `npm run check` and `npm run build` for the other checks. The production bundle goes to `dist/`. GitHub Actions runs the same checks on Ubuntu and Windows for pull requests and pushes to `main`.
