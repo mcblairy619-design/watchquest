@@ -1,4 +1,4 @@
-import type { Title } from "./catalogue";
+import type { Title } from "../catalogue/catalogue";
 
 export const catalogueGenres = [
   "Action",

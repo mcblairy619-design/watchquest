@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Grouped project documentation and frontend feature files. No changes to app behaviour or stored data.
+- Standardised Node and line endings for Windows and Linux, and added a two-OS CI workflow with portable browser tests.
+- Split the browser suite into independent feature scenarios, with shared test setup and synthetic provider fixtures.
+
 ## Live catalogue reliability
 
 - Added reconnect recovery and separate messages for failed checks and successful checks with no eligible offers.

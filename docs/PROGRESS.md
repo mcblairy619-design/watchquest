@@ -1,5 +1,20 @@
 # Progress and asset audit
 
+## Browser test organisation
+
+- Replaced the single browser file with six feature suites covering smoke checks, watchlist, discovery, Movie DNA, catalogue and weekly picks. Each scenario uses a fresh browser context, and synthetic provider responses remain test-only. The existing Node suites and runtime are unchanged.
+- On Linux, all 34 tests passed with no skips, including 17 browser scenarios. ESLint, TypeScript and the production build also passed. The existing CI workflow picks up the nested suites through `npm test`; Windows has not been run for this checkpoint.
+
+## Windows and Linux development
+
+- Pinned the shared Node.js version and standardised text file line endings. The browser suite now uses Playwright-managed headless Chromium and starts a temporary local demo server, with provider responses mocked where needed.
+- A clean dependency install, ESLint, TypeScript, production build and all 21 tests passed on Linux with no skips, including desktop and phone-sized browser coverage. The new Ubuntu and Windows CI workflow passes actionlint; hosted execution and Windows results have not been verified yet.
+
+## Repository organisation
+
+- Grouped catalogue and Movie DNA frontend modules by feature and moved project documentation into `docs/`. Runtime changes are limited to import paths; storage keys and provider handling were not touched.
+- ESLint, TypeScript, the production build, relative Markdown links and 17 automated tests passed on Linux. The five browser tests were skipped because they require executables at fixed Windows paths; mobile browser coverage is not claimed for this checkpoint.
+
 ## Live catalogue reliability · 23 November 2026
 
 - Confirmed live mode on the normal local server. One budgeted primary catalogue diagnostic returned HTTP 200 and 20 verified UK Netflix titles, taking the ledger from 58 to 59 of 450 requests. Historical provider failures were not recorded, so the initial trigger could not be confirmed.

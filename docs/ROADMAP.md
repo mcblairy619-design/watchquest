@@ -21,4 +21,4 @@
 | 14 | Launch approved hosting and installable PWA. Verify deployment, installation and operational readiness. |
 | 15 | Evaluate native iOS and Android releases with shared APIs and domain logic. |
 
-Phase 2.1 is backed up to GitHub. Phases 2.2 and 3 are local checkpoints pending push approval. Phase 4 is awaiting owner approval. See [PROGRESS.md](PROGRESS.md) for verification status.
+Phases 2.1, 2.2 and 3 are on GitHub `main`. Phase 4 is awaiting owner approval. See [PROGRESS.md](PROGRESS.md) for verification status.

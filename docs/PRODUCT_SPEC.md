@@ -47,8 +47,8 @@ Potential domain: MyStreamGuide.com, subject to availability and ownership.
 - Test every completed feature.
 - Create Git checkpoints after successful phases.
 - Stop after each phase and explain what has been completed.
-- Maintain AGENTS.md, PRODUCT_SPEC.md, ROADMAP.md, PROGRESS.md, CHANGELOG.md and README.md.
-- Maintain an up-to-date .env.example file without real credentials.
+- Maintain [AGENTS.md](../AGENTS.md), this specification, [the roadmap](ROADMAP.md), [progress](PROGRESS.md), [the changelog](../CHANGELOG.md) and [the README](../README.md).
+- Maintain an up-to-date [environment template](../.env.example) file without real credentials.
 - Record outstanding bugs, technical limitations and required decisions.
 
 ## 4. TECHNICAL ARCHITECTURE
@@ -772,7 +772,7 @@ Never mark unfinished or untested functionality as complete.
 
 ## 31. FIRST TASK
 
-Phase 0 has been approved and Phase 1 is ready for review. See [PROGRESS.md](PROGRESS.md) for completed work and verification.
+See [PROGRESS.md](PROGRESS.md) for completed work and verification, and the [roadmap](ROADMAP.md) for the current phase.
 
 Begin with Phase 0 only.
 
