@@ -364,14 +364,12 @@ function choose(
       const overlap = titleGenres(title).filter((genre) =>
         used.includes(genre),
       ).length;
-      const score =
-        assessment.score -
-        (recent.has(title.id) ? 7 : 0) -
-        Math.min(6, overlap * 2);
+      const score = assessment.score - Math.min(6, overlap * 2);
       return { title, assessment, score };
     });
   options.sort(
     (a, b) =>
+      Number(recent.has(a.title.id)) - Number(recent.has(b.title.id)) ||
       b.score - a.score ||
       (a.title.id < b.title.id ? -1 : a.title.id > b.title.id ? 1 : 0),
   );

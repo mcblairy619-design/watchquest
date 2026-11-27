@@ -16,11 +16,13 @@ TMDB is optional and serves legacy saved-title details when Movie of the Night i
 
 ## Request budget and caching
 
+Phase 4 filters, sorts, rolls and spins act on results already loaded in the current session. Wider title search is debounced and uses the existing guarded catalogue route. Watchlist details use the existing lookup when fresh results are unavailable. No completed-response cache or artwork permission changed in Phase 4.
+
 Movie DNA uses the country service list and on-demand title metadata. The weekly dashboard can request a film or series supplement when the first non-empty verified catalogue page is too short. These requests share the same budget and caching rules. [Movie DNA details](MOVIE_DNA.md)
 
 - The app enforces at most **450 upstream requests per rolling 31 days**, or a lower configured limit. A local ignored ledger survives restarts, and the server reserves a slot before each upstream attempt. The provider account quota is separate. The direct terms say API access pauses at the plan cap without request overage fees. This local ledger covers this checkout only. Keep the provider account on the free plan. [Direct developer terms](https://developers.movieofthenight.com/terms-and-conditions)
 - Requests are server-side, with an eight-second timeout, a separate short-term throttle and a cooldown when the provider rate limits requests. Simultaneous matching requests share one fetch. Completed Movie of the Night responses are cached in memory for `AVAILABILITY_CACHE_MINUTES` (0 by default, at most 360). Configure a positive value only within the applicable terms. Active catalogue results stop qualifying after six hours or a known offer expiry. [Direct developer terms](https://developers.movieofthenight.com/terms-and-conditions)
-- The local Vite dev and preview servers handle the API. The production build is static. A hosted live catalogue would need equivalent server routing, protected secrets and a shared quota mechanism.
+- The root Vite dev and preview commands still handle the API by default. The standalone Node API in `apps/api/` uses the same routes and reads credentials from the server environment. For an approved local provider check, start it from the repository root with `node --env-file=.env.local apps/api/start.mjs`. Both local modes use the existing ledger at the repository root. Do not run both servers with live access as the default setup. The production frontend build is static; hosted cross-origin routing, protected secrets and a shared quota mechanism are still to be configured.
 
 ## Local catalogue recovery
 

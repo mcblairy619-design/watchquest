@@ -722,37 +722,7 @@ Test desktop Chrome, Edge and mobile Safari.
 
 ## 29. DEVELOPMENT ROADMAP
 
-Phase 0: Inspect existing files, licences and assets. Create project documentation.
-
-Phase 1: Build the responsive website foundation and approved branding.
-
-Phase 2: Integrate permitted film metadata and streaming availability data.
-
-Phase 3: Implement authentication, database and basic onboarding.
-
-Phase 4: Build Movie DNA and personalised weekly recommendations.
-
-Phase 5: Implement Roll the Dice, Spin to Watch, search and discovery.
-
-Phase 6: Implement watchlists, ratings, reviews and viewing history.
-
-Phase 7: Implement community features, achievements and leaderboards.
-
-Phase 8: Build and test the avatar laboratory.
-
-Phase 9: Integrate the avatar editor and animated founder mascot.
-
-Phase 10: Implement advanced search, alerts, friends mode and statistics.
-
-Phase 11: Prepare premium entitlements and administration.
-
-Phase 12: Complete private beta testing and security review.
-
-Phase 13: Confirm commercial licensing, privacy requirements, operating costs, payments and advertising arrangements.
-
-Phase 14: Launch the public website and installable PWA.
-
-Phase 15: Evaluate native iOS and Android releases.
+See the [approved development roadmap](ROADMAP.md) for phase sequencing and acceptance criteria. [PROGRESS.md](PROGRESS.md) records completed work and verification.
 
 ## 30. TESTING REQUIREMENTS
 
@@ -769,32 +739,3 @@ At the end of every phase:
 - Create a Git checkpoint.
 
 Never mark unfinished or untested functionality as complete.
-
-## 31. FIRST TASK
-
-See [PROGRESS.md](PROGRESS.md) for completed work and verification, and the [roadmap](ROADMAP.md) for the current phase.
-
-Begin with Phase 0 only.
-
-Inspect the current project folder, branding, design boards and downloaded character assets.
-
-Determine:
-
-1. Which assets are present.
-2. Which assets have verifiable commercial licences.
-3. Which character packs are compatible with browser-based rendering.
-4. Which software and dependencies are installed.
-5. Which project requirements can be implemented without additional spending.
-6. Which external accounts or API credentials will eventually be required.
-
-Create the project specification, roadmap, progress tracker and development instructions.
-
-Explain your findings in simple British English.
-
-Do not purchase anything.
-
-Do not activate paid APIs.
-
-Do not start building every feature simultaneously.
-
-After completing Phase 0, provide a clear report and wait for my approval before proceeding to Phase 1.

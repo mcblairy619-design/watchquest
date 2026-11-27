@@ -1,0 +1,9 @@
+{
+  "name": "@watchquest/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local start.mjs"
+  }
+}

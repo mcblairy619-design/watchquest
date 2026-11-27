@@ -11,7 +11,7 @@ These rules apply to both human contributors and coding agents. The goal is to k
 
 ## Make the smallest safe change
 
-- Prefer the existing feature layout. Browser catalogue code belongs in `src/catalogue/`, recommendation and questionnaire code in `src/movie-dna/`, and provider access and quota handling in `server/`.
+- Prefer the existing workspace layout. Browser catalogue code belongs in `apps/web/src/catalogue/`, recommendation and questionnaire code in `apps/web/src/movie-dna/`, and server-side provider access and quota handling in `apps/api/`. The web workspace calls the catalogue API over HTTP; it does not import server code.
 - Preserve existing browser data, including saved and watched titles, ratings, preferences and weekly picks. If a storage key or data shape must change, keep old data readable and add a regression test. Never clear user data as a workaround.
 - Keep fictional demo titles separate from provider data and keep synthetic provider responses in test fixtures. Do not add real credentials, make live API calls in routine tests, invent real-title metadata or enable unapproved artwork or paid services.
 - Add or update focused regression tests for behaviour changes. Keep browser tests independent; use the existing harness and scenario-local state. Keep Windows and Linux support: use the Node version in [`.node-version`](.node-version), install with `npm ci` on each machine and avoid hard-coded executable paths or platform-specific syntax in shared npm scripts.
