@@ -2,6 +2,12 @@
 
 Roadmap V2 approved on 24 November 2026. Historical phase numbers and delivered checkpoints are preserved. [PROGRESS.md](PROGRESS.md) records actual verification.
 
+## Current checkpoint
+
+Phase 4.0 (the in-place workspace migration) is implemented. The [progress log](PROGRESS.md) records the verification already performed and the rollback revision. Remaining work at this checkpoint is to verify the final migration candidate, confirm passing Windows and Ubuntu CI before merging, and report the results for owner review. Use demo data or fixtures; do not spend live provider quota for routine checks.
+
+Stop at that handoff. Phase 4.1 (private hosted staging) and later account and data-sync work are not authorised by the migration or by passing checks. Do not provision hosting, start account work or incur costs without explicit owner approval.
+
 ## Release scope
 
 - **Product:** help people choose a film or series they can already stream. WatchQuest combines results across selected services; users declare their subscriptions without connecting their streaming accounts or sharing credentials.
